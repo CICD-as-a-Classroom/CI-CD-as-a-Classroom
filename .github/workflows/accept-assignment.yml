@@ -6,7 +6,8 @@ on:
       userOauthToken:
         description: "OAuth token for student's GitHub / GitLab account"
         required: true
-      assignmentRepoPathSuffix: "Suffix to append to ASSIGNMENT_REPO_PATH_PREFIX to construct path to assignment repository to accept."
+      assignmentRepoPathSuffix:
+        description: "Suffix to append to ASSIGNMENT_REPO_PATH_PREFIX to construct path to assignment repository to accept."
 
 env:
   ASSIGNMENT_READ_USERNAME: ${{ vars.ASSIGNMENT_READ_USERNAME }}
@@ -30,7 +31,7 @@ jobs:
           assignment_repo_path="${ASSIGNMENT_REPO_PATH_PREFIX%/}/${ASSIGNMENT_REPO_PATH_SUFFIX#/}"
           
           # Clone assignment repo
-          git clone "https://${ASSIGNMENT_READ_USERNAME}:${ASSIGNMENT_READ_TOKEN}@${assignment_repo_path}" repo
+          git clone "https://${ASSIGNMENT_READ_USERNAME}:${ASSIGNMENT_READ_TOKEN}@${assignment_repo_path}" assignments-repo
 
           # List repo files
-          ls repo
+          ls assignments-repo
