@@ -1,0 +1,36 @@
+name: Accept Assignment
+
+on:
+  workflow_dispatch:
+    inputs:
+      userOauthToken:
+        description: "OAuth token for student's GitHub / GitLab account"
+        required: true
+      assignmentRepoPathSuffix: "Suffix to append to ASSIGNMENT_REPO_PATH_PREFIX to construct path to assignment repository to accept."
+
+env:
+  ASSIGNMENT_READ_USERNAME: ${{ vars.ASSIGNMENT_READ_USERNAME }}
+  ASSIGNMENT_READ_TOKEN: ${{ secrets.ASSIGNMENT_READ_TOKEN }}
+  ASSIGNMENT_REPO_PATH_PREFIX: ${{ vars.ASSIGNMENT_REPO_PATH_PREFIX || github.repository }}
+  ASSIGNMENT_REPO_PATH_SUFFIX: ${{ inputs.assignmentRepoPathSuffix }}
+  USER_OAUTH_TOKEN: ${{ inputs.userOauthToken }}
+
+jobs:
+  accept-assignment:
+    runs-on: ubuntu-latest
+    steps:
+      # Clone the assignment repository
+      - name: Checkout Code
+        run: |
+          # Mask user oauth token in logs
+          echo "::add-mask::$USER_OAUTH_TOKEN"
+          
+          # Concatenate assignment repo path prefix and suffix with single /
+          # between them
+          assignment_repo_path="${ASSIGNMENT_REPO_PATH_PREFIX%/}/${ASSIGNMENT_REPO_PATH_SUFFIX#/}"
+          
+          # Clone assignment repo
+          git clone "https://${ASSIGNMENT_READ_USERNAME}:${ASSIGNMENT_READ_TOKEN}@${assignment_repo_path}" repo
+
+          # List repo files
+          ls repo
