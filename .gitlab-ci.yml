@@ -1,0 +1,26 @@
+stages:
+  - trigger
+
+spec:
+  inputs:
+    action:
+      description: Specifies action to be executed
+      options:
+        - accept-assignment
+        - test-assignment
+
+job_accept_assignment:
+  stage: trigger
+  script:
+    - echo 'Accept Assignment'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    - if: '$[[ inputs.trigger ]] == "accept-assignment"'
+
+job_test_assignment:
+  stage: trigger
+  script:
+    - echo 'Test Assignment'
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'
+    - if: '$[[ inputs.trigger ]] == "test-assignment"'
