@@ -59,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             originatingUrl: window.location.href
         };
         const stateBase64 =
-            new TextEncoder.encode(JSON.stringify(state))
+            new TextEncoder().encode(JSON.stringify(state))
             .toBase64({ alphabet: "base64url", omitPadding: true });
         
         setCookie("stateBase64", stateBase64, "/", 3600);
