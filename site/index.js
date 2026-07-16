@@ -17,7 +17,6 @@ function setCookie(name, value, path, maxAgeSeconds, sameSite, allowInsecure) {
 }
 
 function getCookie(name) {
-    const value = ;
     const parts = `; ${document.cookie}`.split(`; ${encodeURIComponent(name)}=`);
     if (parts.length === 2) {
         return decodeURIComponent(parts.pop().split(';').shift());
@@ -74,8 +73,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const loadingContent = document.getElementById("loading-content");
     const acceptAssignmentContent = document.getElementById("accept-assignment-content");
-    console.log('HTML fully loaded and parsed');
-
     loadingContent.style.display = "none";
     acceptAssignmentContent.style.display = "block";
 });
