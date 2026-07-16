@@ -1,5 +1,15 @@
+html {
+	font-size: 100%;
+}
+
+body {
+	font-family: "Roboto", sans-serif;
+	font-size: 2rem;
+	line-height: 2.2rem;
+}
+
 #main-col-container {
-	width: 70vw;
+	width: 50vw;
 	min-width: 50rem;
 	margin-left: auto;
 	margin-right: auto;
@@ -12,4 +22,18 @@
 	justify-content: center;
 	margin-left: auto;
 	margin-right: auto;
+}
+
+#loading-content {
+	width: 10rem;
+	max-width: 100%;
+	background-color: #000000ff;
+	aspect-ratio: 1;
+}
+
+#accept-assignment-content {
+	display: hidden;
+	width: 10rem;
+	max-width: 100%;
+	aspect-ratio: 1;
 }

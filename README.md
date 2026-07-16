@@ -34,9 +34,6 @@ If this repository is being used as the webapp and is hosted on GitHub,
 the following repository variables and secrets must be configured in GitHub:
 
 - Variables:
-  - `ASSIGNMENT_REPO`: The URL of the remote git repository hosting all
-    assignment template code, starting with the hostname. For
-    example, `github.com/my_classroom_gh_organization/assignments`.
   - `STUDENT_PLATFORM`: The platform that's used to authenticate students
     (e.g., via OAuth or GitHub App) and store their generated assignment
     repositories. The user's username on said platform
