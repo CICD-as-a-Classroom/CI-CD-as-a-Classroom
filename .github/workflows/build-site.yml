@@ -1,37 +1,79 @@
-# Builds and deploys site to GitHub Pages
-
 name: Build site and deploy to GH Pages
 
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  workflow_dispatch: # For manual execution
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    environment:
+      name: production
+      deployment: false
+    env:
+      PUBLIC_PATH: ${{ vars.PUBLIC_PATH }}
+      POLL_DELAY: ${{ vars.POLL_DELAY }}
+      AUTH_APP_ID: ${{ vars.AUTH_APP_ID }}
+      BACKEND_REPO_OWNER: ${{ vars.BACKEND_REPO_OWNER }}
+      BACKEND_REPO: ${{ vars.BACKEND_REPO }}
+      WORKFLOW_DISPATCH_APP_ID: ${{ vars.WORKFLOW_DISPATCH_APP_ID }}
+      WORKFLOW_DISPATCH_APP_INSTALLATION_ID: ${{ vars.WORKFLOW_DISPATCH_APP_INSTALLATION_ID }}
+      WORKFLOW_DISPATCH_APP_PRIVATE_KEY: ${{ secrets.WORKFLOW_DISPATCH_APP_PRIVATE_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: Build
+        working-directory: ./site
         run: |
-          echo "Nothing to build for now"
+          # Inject build vars into config/build.conf, which gets read by
+          # webpack.prod.js
+          mkdir -p config
+          echo "publicPath: '${PUBLIC_PATH}'" >> config/build.conf
+
+          # Inject application vars and secrets into src/config/conf.yaml
+          # and src/config/secrets.yaml, respectively. These files get loaded
+          # and bundled with the application by webpack and yaml-loader.
+          # Note: The only secret is the workflow dispatch app private key,
+          # , which isn't a "true" secret;
+          # the private key is bundled with the frontend code and should
+          # be associated with a GitHub App that only has the
+          # necessary permissions (actions: read/write and contents: read) to
+          # dispatch backend workflows on the backend workflow repository
+          # to authenticate users and accept assignments. Storing it as a secret
+          # instead of a repository variable is just to convey that it's an
+          # app private key with nonzero privileges.
+          mkdir -p src/config
+
+          echo "pollDelay: ${POLL_DELAY}" >> src/config/conf.yaml
+          echo "authClientId: '${AUTH_APP_ID}'" >> src/config/conf.yaml
+          echo "backendRepoOwner: '${BACKEND_REPO_OWNER}'" >> src/config/conf.yaml
+          echo "backendRepo: '${BACKEND_REPO}'" >> src/config/conf.yaml
+          echo "dispatchRef: 'main'" >> src/config/conf.yaml
+          echo "workflowDispatchAppId: '${WORKFLOW_DISPATCH_APP_ID}'" >> src/config/conf.yaml
+          echo "workflowDispatchAppInstallationId: ${WORKFLOW_DISPATCH_APP_INSTALLATION_ID}" >> src/config/conf.yaml
+          echo "$WORKFLOW_DISPATCH_APP_PRIVATE_KEY" > private-key-pkcs1.pem
+
+          # Convert private key from PKCS1 to PKCS8
+          openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key-pkcs1.pem -out src/config/secret-workflow-dispatch-app-private-key.pem
+          rm -f private-key-pkcs1.pem
+
+          # Build
+          npm i
+          npm run build
+          
       - name: Upload static files as artifact
         id: deployment
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site/
+          path: site/dist/
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     permissions:
-      pages: write      # to deploy to Pages
-      id-token: write   # to verify the deployment originates from an appropriate source
+      pages: write
+      id-token: write
     runs-on: ubuntu-latest
     needs: build
     steps:
