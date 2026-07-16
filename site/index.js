@@ -1,9 +1,9 @@
 function setCookie(name, value, path, maxAgeSeconds, sameSite, allowInsecure) {
     if (!path) {
-        path = "/";
+        path = '/';
     }
 
-    let cookieStr = encodeURIComponent(name) + "=" + encodeURIComponent(value) + `; path=${path}`;
+    let cookieStr = encodeURIComponent(name) + '=' + encodeURIComponent(value) + `; path=${path}`;
     if (maxAgeSeconds) {
         cookieStr += `; max-age=${maxAgeSeconds}`;
     }
@@ -38,20 +38,20 @@ async function sha256(message) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    refreshToken = getCookie("refreshToken");
-    accessToken = getCookie("accessToken");
+    refreshToken = getCookie('refreshToken');
+    accessToken = getCookie('accessToken');
 
     if (refreshToken === null || accessToken === null) {
         // Not logged in. Redirect browser to GitHub App login.
         
-        const authClientId = "Iv23liDO5DpoJm3700YN"; // TODO inject at build time from repo var
+        const authClientId = 'Iv23liDO5DpoJm3700YN'; // TODO inject at build time from repo var
 
         const pkceCodeVerifier = generateSecureString(128);
         const pkceCodeChallenge =
             (await sha256(pkceCodeVerifier))
-            .toBase64({ alphabet: "base64url", omitPadding: true });
+            .toBase64({ alphabet: 'base64url', omitPadding: true });
         
-        setCookie("pkceCodeVerifier", pkceCodeVerifier, "/", 3600);
+        setCookie('pkceCodeVerifier', pkceCodeVerifier, '/', 3600);
 
         const randomStateToken = generateSecureString(32);
         const state = {
@@ -60,9 +60,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
         const stateBase64 =
             new TextEncoder().encode(JSON.stringify(state))
-            .toBase64({ alphabet: "base64url", omitPadding: true });
+            .toBase64({ alphabet: 'base64url', omitPadding: true });
         
-        setCookie("stateBase64", stateBase64, "/", 3600);
+        setCookie('stateBase64', stateBase64, '/', 3600);
         
         window.location.replace(`https://github.com/login/oauth/authorize?client_id=${authClientId}&state=${stateBase64}&code_challenge=${pkceCodeChallenge}&code_challenge_method=S256`)
 
@@ -71,8 +71,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Logged in. Show accept-assignment-content
 
-    const loadingContent = document.getElementById("loading-content");
-    const acceptAssignmentContent = document.getElementById("accept-assignment-content");
-    loadingContent.style.display = "none";
-    acceptAssignmentContent.style.display = "block";
+    const loadingContent = document.getElementById('loading-content');
+    const acceptAssignmentContent = document.getElementById('accept-assignment-content');
+    loadingContent.style.display = 'none';
+    acceptAssignmentContent.style.display = 'block';
 });

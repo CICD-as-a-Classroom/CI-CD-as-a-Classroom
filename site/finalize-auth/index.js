@@ -1,9 +1,9 @@
 function setCookie(name, value, path, maxAgeSeconds, sameSite, allowInsecure) {
     if (!path) {
-        path = "/";
+        path = '/';
     }
 
-    let cookieStr = encodeURIComponent(name) + "=" + encodeURIComponent(value) + `; path=${path}`;
+    let cookieStr = encodeURIComponent(name) + '=' + encodeURIComponent(value) + `; path=${path}`;
     if (maxAgeSeconds) {
         cookieStr += `; max-age=${maxAgeSeconds}`;
     }
@@ -39,13 +39,15 @@ async function sha256(message) {
 
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const authCode = urlParams.get("code");
-    const echoedState = urlParams.get("state");
+    const authCode = urlParams.get('code');
+    const echoedState = urlParams.get('state');
 
-    const stateBase64 = getCookie("stateBase64");
+    const stateBase64 = getCookie('stateBase64');
+
+    // TODO error-handle for missing cookies
     
     if (echoedState !== stateBase64) {
-        console.log("Error. Echoed state does not match.");
+        console.log('Error. Echoed state does not match.');
         // TODO implement
         return;
     }
@@ -53,13 +55,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     const state = new TextDecoder().decode(
         Uint8Array.fromBase64(
             stateBase64,
-            { alphabet: "base64url" }
+            { alphabet: 'base64url' }
         )
     );
 
-    const pkceCodeVerifier = getCookie("pkceCodeVerifier");
+    const pkceCodeVerifier = getCookie('pkceCodeVerifier');
 
-    console.log("Here"); // TODO remove
+    // TODO error-handle for missing cookies
 
-    // Test to try to finalize auth. TODO remove
+    // Quick test to try to finalize auth. TODO remove, this should all be done
+    // in CI-CD workflow / pipeline
+    const url = 'https://github.com/login/oauth/access_token';
+    const queryParams = {
+        'client_id': 'Iv23liDO5DpoJm3700YN',
+        'client_secret': '9a45677f6b40697254ed7c015df73ca5da8ba16e',
+        'code': authCode,
+        'code_verifier': pkceCodeVerifier
+    };
+    url.search = new URLSearchParams(queryParams).toString();
+    const response = await fetch(
+        url,
+        {
+            method: 'POST',
+        }
+    );
+    if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+        return;
+        // TODO implement
+    }
+
+    const data = await response.json();
+
+    console.log(data); // TODO remove
 });
