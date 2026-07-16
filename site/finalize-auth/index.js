@@ -38,5 +38,28 @@ async function sha256(message) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log("Hello, World!");
+    const urlParams = new URLSearchParams(window.location.search);
+    const authCode = urlParams.get("code");
+    const echoedState = urlParams.get("state");
+
+    const stateBase64 = getCookie("stateBase64");
+    
+    if (echoedState !== stateBase64) {
+        console.log("Error. Echoed state does not match.");
+        // TODO implement
+        return;
+    }
+
+    const state = new TextDecoder().decode(
+        Uint8Array.fromBase64(
+            stateBase64,
+            { alphabet: "base64url" }
+        )
+    );
+
+    const pkceCodeVerifier = getCookie("pkceCodeVerifier");
+
+    console.log("Here"); // TODO remove
+
+    // Test to try to finalize auth. TODO remove
 });
