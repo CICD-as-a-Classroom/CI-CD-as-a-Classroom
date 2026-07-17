@@ -29,25 +29,24 @@ done
 echo "$query_result"
 artifacts_url="$(echo "$query_result" | jq '.artifacts_url' -r)"
 artifacts_query_result="$(curl -X 'GET' -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $token" -H 'X-GitHub-Api-Version: 2026-03-10' "$artifacts_url")"
+artifact_zip_download_url_src_url="$(echo "$artifacts_query_result" | jq '.artifacts[] | select(.name == "auth-token") | .archive_download_url' -r)"
 
-echo
-echo "$artifacts_query_result"
+artifact_zip_download_url_result=$(curl -sS -D - -H "Authorization: Bearer $token" -H 'X-GitHub-Api-Version: 2026-03-10' "$artifact_zip_download_url_src_url" -v -o /dev/null)
+artifact_zip_download_url="$(echo "$artifact_zip_download_url_result" | grep --regex "^location:" | sed 's/location: //' | xargs)"
+artifact_zip_download_url=${artifact_zip_download_url%$'\n'}
+artifact_zip_download_url=${artifact_zip_download_url%$'\r'}
 
-#log_location="$(echo "$log_query_result" | grep --regex '^location:' | sed 's/location://' | xargs)"
-#log_location="${log_location%$'\n'}"
-#log_location="${log_location%$'\r'}"
+curl "$artifact_zip_download_url" -v -o auth-token.zip
+mkdir .$$.tmp
+mv auth-token.zip .$$.tmp
+(
+	cd .$$.tmp
+	unzip auth-token.zip
+	echo
+	echo "-------------------"
+	echo "Auth token"
+	echo "-------------------"
+	cat auth-token.bin
+)
 
-echo "-------------------"
-echo "Final result"
-echo "-------------------"
-#echo "$log_location"
-#curl "$(echo -n "$log_location")" -v -o log.zip
-#mkdir .$$.tmp
-#mv log.zip .$$.tmp
-#(
-#	cd .$$.tmp
-#	unzip log.zip
-#	cd gen_user_auth_token
-#	cat *.txt
-#)
-#rm -rf .$$.tmp
+rm -rf .$$.tmp
