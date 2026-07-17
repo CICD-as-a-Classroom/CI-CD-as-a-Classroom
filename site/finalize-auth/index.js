@@ -128,8 +128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Get run url for polling
-    const responseData = response.json();
-    console.log(responseData);
+    const responseData = await response.json();
     const runURL = responseData['run_url'];
 
     // Wait three seconds, then poll workflow run every two seconds until done.    
@@ -154,7 +153,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // TODO implement
         }
         
-        const pollResponseData = pollResponse.json();
+        const pollResponseData = await pollResponse.json();
         
         runStatus = pollResponseData['status'];
         runConclusion = pollResponseData['conclusion'];
