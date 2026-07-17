@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
     const owner = 'CICD-as-a-Classroom'; // TODO inject from GH repo var
     const repo = 'CI-CD-as-a-Classroom'; // TODO inject from GH repo var
-    const dispatch_token = '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' // TODO inject from GH repo var
+    const dispatch_token = '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' // TODO inject from GH repo var
     const response = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/actions/workflows/gen-user-auth-token-github.yml/dispatches`,
         {
