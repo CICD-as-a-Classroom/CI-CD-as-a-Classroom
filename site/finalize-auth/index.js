@@ -165,8 +165,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         await sleep(2000);
     } while (runConclusion === null);
 
-    console.log(`Final run status: ${runStatus}`);
-    console.log(`Final run conclusion: ${runConclusion}`);
+    if (runConclusion !== 'success') {
+        console.log(`Error: Auth workflow run failed. Got conclusion ${runConclusion} and status ${runStatus}`);
+        return;
+        // TODO implement
+    }
 
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(
