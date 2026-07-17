@@ -129,8 +129,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Get run url for polling
     const responseData = response.json();
+    console.log(responseData);
     const runURL = responseData['run_url'];
-    console.log(runURL);
 
     // Wait three seconds, then poll workflow run every two seconds until done.    
     await sleep(3000);
