@@ -131,9 +131,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseData = response.json()
     const runURL = responseData['run_url']
 
-    // Poll workflow run every two seconds until done.    
-    let runStatus = null
-    let runConclusion = null
+    // Wait three seconds, then poll workflow run every two seconds until done.    
+    await sleep(3000);
+    let runStatus = null;
+    let runConclusion = null;
     do {
         const pollResponse = await fetch(
             runURL,
