@@ -1,3 +1,5 @@
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function setCookie(name, value, path, maxAgeSeconds, sameSite, allowInsecure) {
     if (!path) {
         path = '/';
@@ -125,7 +127,45 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
-    console.log('Here');
+    // Get run url for polling
+    const responseData = response.json()
+    const runURL = responseData['run_url']
+
+    // Poll workflow run every two seconds until done.    
+    let runStatus = null
+    let runConclusion = null
+    do {
+        const pollResponse = await fetch(
+            runURL,
+            {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/vnd.github+json',
+                    'Authorization': `Bearer ${dispatch_token}`,
+                    'X-GitHub-Api-Version': '2026-03-10'
+                }
+            }
+        );
+        if (!pollResponse.ok) {
+            console.log("Error: Failed to poll workflow run status");
+            return;
+            // TODO implement
+        }
+        
+        const pollResponseData = pollResponse.json();
+        
+        runStatus = pollResponseData['status'];
+        runConclusion = pollResponseData['conclusion'];
+
+        if (runConclusion !== null) {
+            break;
+        }
+
+        await sleep(2000);
+    } while (runConclusion === null);
+
+    console.log(`Final run status: ${runStatus}`);
+    console.log(`Final run conclusion: ${runConclusion}`);
 
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(
