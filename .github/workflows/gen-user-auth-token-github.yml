@@ -31,12 +31,19 @@ jobs:
           echo "::add-mask::$PKCE_CODE_VERIFIER"
           
           # TODO Retrieve auth token via cURL request
-          curl -X POST -G "https://github.com/login/oauth/access_token" \
-            -d "client_id=$AUTH_CLIENT_ID" \
-            -d "client_secret=$AUTH_CLIENT_SECRET" \
-            -d "code=$AUTH_CODE" \
-            -d "code_verifier=$PKCE_CODE_VERIFIER"
+          #curl -X POST -G "https://github.com/login/oauth/access_token" \
+          #  -d "client_id=$AUTH_CLIENT_ID" \
+          #  -d "client_secret=$AUTH_CLIENT_SECRET" \
+          #  -d "code=$AUTH_CODE" \
+          #  -d "code_verifier=$PKCE_CODE_VERIFIER"
           
           # TODO RSA-encrypt the auth token using AUTH_TOKEN_RSA_ENCRYPTION_KEY
           # and echo it to standard output to be retrieved and decrypted by
           # client
+          touch auth-token.bin
+      - name: Upload encrypted auth token
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-token
+          path: auth-token.bin
+          retention-days: 1
