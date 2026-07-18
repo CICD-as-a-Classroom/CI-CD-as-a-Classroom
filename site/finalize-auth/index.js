@@ -231,10 +231,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     const zip = await JSZip.loadAsync(zipArrayBuffer);
 
     // Iterate over extracted files
+    console.log('Zipped files: ');
+    console.log(zip.files);
     for (const [filename, entry] of Object.entries(zip.files)) {
         console.log(`File found: ${filename}`);
         // 'string' for text data, or use 'blob' or 'uint8array' for non-text
-        const fileData = await fileEntry.async('string');
+        const fileData = await entry.async('string');
+        console.log(`Data as text: ${fileData}`);
     }
 
     return; // TODO remove
