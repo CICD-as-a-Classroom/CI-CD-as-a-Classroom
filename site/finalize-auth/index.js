@@ -93,12 +93,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // TODO dispatch CI/CD workflow to finalize auth flow and generate
     // encrypted access token
+    // TODO delete mock data, uncomment real data
     const data = {
         'ref': 'main',
         'inputs': {
-            'authCode': authCode,
-            'pkceCodeVerifier': pkceCodeVerifier,
-            'authTokenRSAEncryptionKey': publicKeyBase64
+            //'authCode': authCode,
+            //'pkceCodeVerifier': pkceCodeVerifier,
+            //'authTokenRSAEncryptionKey': publicKeyBase64
+            'authCode': '1234',
+            'pkceCodeVerifier': '1234',
+            'authTokenRSAEncryptionKey': '1234'
         }
     };
     const owner = 'CICD-as-a-Classroom'; // TODO inject from GH repo var
@@ -221,17 +225,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             headers: {
                 'Authorization': `Bearer ${dispatch_token}`,
                 'X-GitHub-Api-Version': '2026-03-10'
-            },
-            redirect: 'manual'
+            }
         }
     );
-    if (!artifactArchiveDownloadURLResponse.redirected && !artifactArchiveDownloadURLResponse.ok) {
+    console.log(`Archive download URL response status: ${artifactArchiveDownloadURLResponse.status}`);
+    if (!artifactArchiveDownloadURLResponse.ok) {
         console.log("Error: Failed to retrieve archive redirect URL for result artifact");
         return;
         // TODO implement
     }
     console.log('retrieved result artifact archive redirect URL');
 
+    /*
     // Extract generated redirect link for archive download from response
     // header
     const artifactArchiveRedirectURL = artifactArchiveDownloadURLResponse.headers.get('location');
@@ -247,6 +252,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
     console.log('retrieved result artifact archive');
+    */
 
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(
