@@ -226,6 +226,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
+    // Extract archive contents with JSZip
+    const zipArrayBuffer = await artifactArchiveDownloadResponse.arrayBuffer();
+    const zip = await JSZip.loadAsync(zipArrayBuffer);
+
+    // Iterate over extracted files
+    for (const [filename, entry] of Object.entries(zip.files)) {
+        console.log(`File found: ${filename}`);
+        // 'string' for text data, or use 'blob' or 'uint8array' for non-text
+        const fileData = await fileEntry.async('string');
+    }
+
+    return; // TODO remove
+
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(
         {name: 'RSA-OAEP'},
