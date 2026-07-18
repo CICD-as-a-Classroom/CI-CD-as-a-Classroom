@@ -40,10 +40,12 @@ jobs:
           # TODO RSA-encrypt the auth token using AUTH_TOKEN_RSA_ENCRYPTION_KEY
           # and echo it to standard output to be retrieved and decrypted by
           # client
-          touch auth-token.bin
+          mkdir -p result
+          touch result/auth-token.bin
+          echo '{"status": "success"}' > result/status.json
       - name: Upload encrypted auth token
         uses: actions/upload-artifact@v4
         with:
-          name: auth-token
-          path: auth-token.bin
+          name: result
+          path: result/
           retention-days: 1

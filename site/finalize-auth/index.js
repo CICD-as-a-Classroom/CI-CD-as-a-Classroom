@@ -135,6 +135,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     await sleep(3000);
     let runStatus = null;
     let runConclusion = null;
+    let pollResponseData;
     do {
         const pollResponse = await fetch(
             runURL,
@@ -153,7 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // TODO implement
         }
         
-        const pollResponseData = await pollResponse.json();
+        pollResponseData = await pollResponse.json();
         
         runStatus = pollResponseData['status'];
         runConclusion = pollResponseData['conclusion'];
@@ -167,6 +168,72 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (runConclusion !== 'success') {
         console.log(`Error: Auth workflow run failed. Got conclusion ${runConclusion} and status ${runStatus}`);
+        return;
+        // TODO implement
+    }
+
+    // Extract artifacts_url from final pollResponseData. Query it
+    // to get list of artifacts.
+    const artifactsURL = pollResponseData['artifacts_url'];
+    const artifactsResponse = await fetch(
+        artifactsURL,
+        {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${dispatch_token}`,
+                'X-GitHub-Api-Version': '2026-03-10'
+            }
+        }
+    );
+    if (!artifactsResponse.ok) {
+        console.log("Error: Failed to retrieve workflow run artifacts");
+        return;
+        // TODO implement
+    }
+
+    const artifactsResponseJson = await artifactsResponse.json();
+
+    // Get result artifact metadata
+    const resultArtifacts = artifactsResponseJson['artifacts'].filter(x => x.name == 'result');
+    if (resultArtifacts.length == 0) {
+        console.log("Error: No result artifact found");
+        return;
+        // TODO implement
+    }
+    
+    const resultArtifact = resultArtifacts[0];
+
+    // Query the archive download url for result artifact
+    const artifactArchiveDownloadURLResponse = await fetch(
+        resultArtifact['archive_download_url'],
+        {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/vnd.github+json',
+                'Authorization': `Bearer ${dispatch_token}`,
+                'X-GitHub-Api-Version': '2026-03-10'
+            },
+            redirect: 'manual'
+        }
+    );
+    if (!artifactArchiveDownloadURLResponse.redirected && !artifactArchiveDownloadURLResponse.ok) {
+        console.log("Error: Failed to retrieve archive download URL for result artifact");
+        return;
+        // TODO implement
+    }
+
+    // Extract generated redirect link for archive download from response
+    // header
+    const artifactArchiveRedirectURL = artifactArchiveDownloadURLResponse.headers.get('location');
+    
+    // Query the final archive download URL (with no bearer token)
+    // to retrieve the result.zip artifact archive
+    const artifactArchiveRedirectResponse = await fetch(
+        artifactArchiveRedirectURL
+    );
+    if (!artifactArchiveRedirectResponse.ok) {
+        console.log("Error: Failed to download result artifact archive");
         return;
         // TODO implement
     }
