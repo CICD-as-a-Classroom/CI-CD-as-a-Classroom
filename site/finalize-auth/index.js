@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const pollResponse = await fetch(
             runURL,
             {
-                method: 'GET',
+                cache: 'no-store',
                 headers: {
                     'Accept': 'application/vnd.github+json',
                     'Authorization': `Bearer ${dispatch_token}`,
@@ -189,7 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const artifactsResponse = await fetch(
         artifactsURL,
         {
-            method: 'GET',
+            cache: 'no-store',
             headers: {
                 'Accept': 'application/vnd.github+json',
                 'Authorization': `Bearer ${dispatch_token}`,
@@ -216,43 +216,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     const resultArtifact = resultArtifacts[0];
 
-    // Query the archive download url for result artifact
+    // Download the result artifact archive
     console.log(`url: ${resultArtifact['archive_download_url']}`);
-    const artifactArchiveDownloadURLResponse = await fetch(
+    const artifactArchiveDownloadResponse = await fetch(
         resultArtifact['archive_download_url'],
         {
-            method: 'GET',
+            cache: 'no-store',
             headers: {
                 'Authorization': `Bearer ${dispatch_token}`,
                 'X-GitHub-Api-Version': '2026-03-10'
             }
         }
     );
-    console.log(`Archive download URL response status: ${artifactArchiveDownloadURLResponse.status}`);
-    if (!artifactArchiveDownloadURLResponse.ok) {
+    console.log(`Archive download URL response status: ${artifactArchiveDownloadResponse.status}`);
+    if (!artifactArchiveDownloadResponse.ok) {
         console.log("Error: Failed to retrieve archive redirect URL for result artifact");
         return;
         // TODO implement
     }
     console.log('retrieved result artifact archive redirect URL');
-
-    /*
-    // Extract generated redirect link for archive download from response
-    // header
-    const artifactArchiveRedirectURL = artifactArchiveDownloadURLResponse.headers.get('location');
-    
-    // Query the final archive download URL (with no bearer token)
-    // to retrieve the result.zip artifact archive
-    const artifactArchiveRedirectResponse = await fetch(
-        artifactArchiveRedirectURL
-    );
-    if (!artifactArchiveRedirectResponse.ok) {
-        console.log("Error: Failed to download result artifact archive");
-        return;
-        // TODO implement
-    }
-    console.log('retrieved result artifact archive');
-    */
 
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(

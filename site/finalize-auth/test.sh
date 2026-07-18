@@ -5,7 +5,7 @@ token+="t_"
 token+="11AINDF5Y0mtIaO1OpgPAs_6QKAg"
 token+="a2FFXUsXv8ARf2H7W6AP61R9C4LQfakeGRU8dKZI2YYG6ZHDAd8DTB"
 
-run_result="$(curl -X 'POST' -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $token" -H 'X-GitHub-Api-Version: 2026-03-10' -d '{"ref": "main", "inputs": {"authCode": "1234", "pkceCodeVerifier": "1234", "authTokenRSAEncryptionKey": "1234"}}' "https://api.github.com/repos/CICD-as-a-Classroom/CI-CD-as-a-Classroom/actions/workflows/gen-user-auth-token-github.yml/dispatches")"
+run_result="$(curl -X 'POST' -H 'Sec-Fetch-Site: cross-site' -H 'Sec-Fetch-Mode: cors' -H 'Sec-Fetch-Dest: empty' -H 'Sec-Ch-Ua-Platform: "Linux"' -H 'Sec-Ch-Ua-Mobile: ?0' -H 'Sec-Ch-Ua: "Not-A.Brand";v="24", "Chromium";v="146"' -H 'Origin: https://cicd-as-a-classroom.github.io' -H 'Content-Type: text/plain;charset=UTF-8' -H 'Accept-Encoding: deflate, br, zstd' -H 'Accept-Language: en-US,en;q=0.9' -H 'Priority: u=1, i' -H 'User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36' -H 'Referer: https://cicd-as-a-classroom.github.io/' -H 'Accept: application/vnd.github+json' -H "Authorization: Bearer $token" -H 'X-GitHub-Api-Version: 2026-03-10' -d '{"ref": "main", "inputs": {"authCode": "1234", "pkceCodeVerifier": "1234", "authTokenRSAEncryptionKey": "1234"}}' "https://api.github.com/repos/CICD-as-a-Classroom/CI-CD-as-a-Classroom/actions/workflows/gen-user-auth-token-github.yml/dispatches")"
 
 
 echo
