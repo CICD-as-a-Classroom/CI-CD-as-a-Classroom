@@ -127,12 +127,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
+    console.log('workflow run started');
+    
     // Get run url for polling
     const responseData = await response.json();
     const runURL = responseData['run_url'];
 
     // Wait three seconds, then poll workflow run every two seconds until done.    
     await sleep(3000);
+    console.log('polling...');
     let runStatus = null;
     let runConclusion = null;
     let pollResponseData;
@@ -159,6 +162,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         runStatus = pollResponseData['status'];
         runConclusion = pollResponseData['conclusion'];
 
+        console.log(`status: ${runStatus}`);
+
         if (runConclusion !== null) {
             break;
         }
@@ -171,6 +176,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
         // TODO implement
     }
+
+    console.log('workflow run done');
 
     // Extract artifacts_url from final pollResponseData. Query it
     // to get list of artifacts.
@@ -191,6 +198,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
         // TODO implement
     }
+    console.log('retrieved artifacts');
 
     const artifactsResponseJson = await artifactsResponse.json();
 
@@ -205,12 +213,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resultArtifact = resultArtifacts[0];
 
     // Query the archive download url for result artifact
+    console.log(`url: ${resultArtifact['archive_download_url']}`);
     const artifactArchiveDownloadURLResponse = await fetch(
         resultArtifact['archive_download_url'],
         {
             method: 'GET',
             headers: {
-                'Accept': 'application/vnd.github+json',
                 'Authorization': `Bearer ${dispatch_token}`,
                 'X-GitHub-Api-Version': '2026-03-10'
             },
@@ -218,10 +226,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     );
     if (!artifactArchiveDownloadURLResponse.redirected && !artifactArchiveDownloadURLResponse.ok) {
-        console.log("Error: Failed to retrieve archive download URL for result artifact");
+        console.log("Error: Failed to retrieve archive redirect URL for result artifact");
         return;
         // TODO implement
     }
+    console.log('retrieved result artifact archive redirect URL');
 
     // Extract generated redirect link for archive download from response
     // header
@@ -237,6 +246,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
         // TODO implement
     }
+    console.log('retrieved result artifact archive');
 
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(
