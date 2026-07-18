@@ -131,7 +131,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
-    console.log('workflow run started');
     
     // Get run url for polling
     const responseData = await response.json();
@@ -139,7 +138,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Wait three seconds, then poll workflow run every two seconds until done.    
     await sleep(3000);
-    console.log('polling...');
     let runStatus = null;
     let runConclusion = null;
     let pollResponseData;
@@ -166,8 +164,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         runStatus = pollResponseData['status'];
         runConclusion = pollResponseData['conclusion'];
 
-        console.log(`status: ${runStatus}`);
-
         if (runConclusion !== null) {
             break;
         }
@@ -180,8 +176,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
         // TODO implement
     }
-
-    console.log('workflow run done');
 
     // Extract artifacts_url from final pollResponseData. Query it
     // to get list of artifacts.
@@ -202,7 +196,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
         // TODO implement
     }
-    console.log('retrieved artifacts');
 
     const artifactsResponseJson = await artifactsResponse.json();
 
@@ -217,7 +210,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resultArtifact = resultArtifacts[0];
 
     // Download the result artifact archive
-    console.log(`url: ${resultArtifact['archive_download_url']}`);
     const artifactArchiveDownloadResponse = await fetch(
         resultArtifact['archive_download_url'],
         {
@@ -228,13 +220,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     );
-    console.log(`Archive download URL response status: ${artifactArchiveDownloadResponse.status}`);
     if (!artifactArchiveDownloadResponse.ok) {
         console.log("Error: Failed to retrieve archive redirect URL for result artifact");
         return;
         // TODO implement
     }
-    console.log('retrieved result artifact archive redirect URL');
 
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(
