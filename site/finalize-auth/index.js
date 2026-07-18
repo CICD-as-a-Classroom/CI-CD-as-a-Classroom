@@ -259,7 +259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Decrypt access token
-    const accessTokenBytes = window.crypto.subtle.decrypt(
+    const accessTokenBytes = await window.crypto.subtle.decrypt(
         {name: 'RSA-OAEP'},
         keyPair.privateKey,
         encryptedAccessToken
