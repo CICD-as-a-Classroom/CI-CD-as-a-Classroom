@@ -230,17 +230,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     const zipArrayBuffer = await artifactArchiveDownloadResponse.arrayBuffer();
     const zip = await JSZip.loadAsync(zipArrayBuffer);
 
-    // Iterate over extracted files
-    console.log('Zipped files: ');
-    console.log(zip.files);
+    if (!Object.hasOwn(zip.files, 'status.json')) {
+        console.log("Error: Artifact result archive missing status.json");
+        return;
+        // TODO Implement
+    }
+
+    const statusJson = await zip.files['status.json'].async('string');
+    const statusObj = JSON.parse(statusJson);
+    if (statusObj.status != 'success') {
+        console.log(`Error: Artifact result archive reported non-success status "${statusObj.status}"`);
+        return;
+        // TODO implement
+    }
+
+    if (!Object.hasOwn(zip.files, 'auth-token.bin')) {
+        console.log("Error: Artifact result archive missing auth-token.bin");
+        return;
+        // TODO Implement
+    }
+
+    const encryptedAccessToken = await zip.files['auth-token.bin'].async('uint8array');
     for (const [filename, entry] of Object.entries(zip.files)) {
         console.log(`File found: ${filename}`);
         // 'string' for text data, or use 'blob' or 'uint8array' for non-text
         const fileData = await entry.async('string');
         console.log(`Data as text: ${fileData}`);
     }
-
-    return; // TODO remove
 
     // Decrypt access token
     const accessTokenBytes = window.crypto.subtle.decrypt(
