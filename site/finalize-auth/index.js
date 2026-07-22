@@ -293,6 +293,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Extract contents of result.zip using JSZip
     const zip = await JSZip.loadAsync(resultPlaintext);
 
+    for (const [filename, entry] of Object.entries(zip.files)) {
+        console.log(`File found: ${filename}`);
+        // 'string' for text data, or use 'blob' or 'uint8array' for non-text
+        const fileData = await entry.async('string');
+        console.log(`Data as text: ${fileData}`);
+    }
+
     if (!Object.hasOwn(zip.files, 'status.json')) {
         console.log("Error: Artifact result archive missing status.json");
         return;
@@ -314,11 +321,4 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     const authToken = await zip.files['auth-token.txt'].async('string');
-
-    for (const [filename, entry] of Object.entries(zip.files)) {
-        console.log(`File found: ${filename}`);
-        // 'string' for text data, or use 'blob' or 'uint8array' for non-text
-        const fileData = await entry.async('string');
-        console.log(`Data as text: ${fileData}`);
-    }
 });
