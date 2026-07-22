@@ -309,14 +309,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO Implement
     }
 
-    if (!Object.hasOwn(zip.files, 'result/access-token.txt')) {
-        console.log("Error: Artifact result archive missing access-token.txt");
-        return;
-        // TODO Implement
-    }
-
-    if (!Object.hasOwn(zip.files, 'result/refresh-token.txt')) {
-        console.log("Error: Artifact result archive missing refresh-token.txt");
+    if (!Object.hasOwn(zip.files, 'result/data.json')) {
+        console.log("Error: Artifact result archive missing data.json");
         return;
         // TODO Implement
     }
@@ -329,12 +323,23 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
-    const accessToken = await zip.files['result/access-token.txt'].async('string');
-    const refreshToken = await zip.files['result/refresh-token.txt'].async('string');
+    const responseDataJson = await zip.files['result/data.json'].async('string');
+    const responseData = JSON.parse(responseDataJson);
 
-    // Store access token and refresh token in cookies
-    setCookie('accessToken', accessToken);
-    setCookie('refreshToken', refreshToken);
+    const accessTokenExpiration = new Date();
+    accessTokenExpiration.setSeconds(
+        accessTokenExpiration.getSeconds() + responseData.accessTokenExpiresInSeconds
+    );
+    const refreshTokenExpiration = new Date();
+    refreshTokenExpiration.setSeconds(
+        refreshTokenExpiration.getSeconds() + responseData.refreshTokenExpiresInSeconds
+    );
+
+    // Store access token, refresh token, and access token expiration in cookies
+    setCookie('accessToken', responseData.accessToken);
+    setCookie('refreshToken', responseData.refreshToken);
+    setCookie('accessTokenExpiration', accessTokenExpiration.toISOString());
+    setCookie('refreshTokenExpiration', refreshTokenExpiration.toISOString());
 
     // Redirect user back to where they were when auth flow started
     window.location.replace(state.originatingUrl);
