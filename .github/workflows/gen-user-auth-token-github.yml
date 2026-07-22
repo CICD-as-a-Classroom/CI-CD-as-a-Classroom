@@ -24,6 +24,10 @@ jobs:
   gen_user_auth_token:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          path: 'repo'
       - name: Generate user auth token
         run: |
           # Mask auth code and code verifier in logs
@@ -43,31 +47,25 @@ jobs:
 
           # Store results for artifact
           mkdir -p result
-          touch result/auth-token.bin
+          touch result/auth-token.txt
           echo '{"status": "success"}' > result/status.json
           
           # Zip results for encryption
           zip -r result.zip result/*
           rm -f result/*
 
-          # Secure results. secure-results.js will generate an AES-256
-          # key, encrypt result.zip with it (using AES-256-CBC for simplicity;
-          # artifacts are immutable, hence tamper-proof, so GCM is unnecessary),
-          # output result.zip.enc containing the salt and ciphertext, encrypt
-          # the generated AES-256 key with the specified RSA key
-          # (result-rsa-encryption-key.pub), and output
-          # result-encryption-key.pem containing the encrypted AES key.
-          # TODO
-          touch result.zip.enc
-          touch result-encryption-key.pem
-
-          # Delete plaintext result.zip, and move result ciphertext to
-          # result/
+          # Encrypt result.zip. Generates result.zip.enc, aes-key.enc, and
+          # iv.bin
+          result_encryption_key_base64=$(echo "$RESULT_ENCRYPTION_KEY" | tr '-_' '+/')
+          node repo/workflow-utils/encrypt.js -f result.zip -k "$result_encryption_key_base64"
+          
+          # Delete plaintext result.zip, and move output files to result/
           rm -f result.zip
           mv result.zip.enc result/
-          mv result-encryption-key.pem result/
+          mv aes-key.enc result/
+          mv iv.bin result/
 
-      - name: Upload encrypted auth token
+      - name: Upload secure results
         uses: actions/upload-artifact@v4
         with:
           name: result

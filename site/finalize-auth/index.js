@@ -54,6 +54,31 @@ async function generateRSAKeys() {
     return keyPair
 }
 
+async function decryptAES(ciphertext, key, iv) {
+  const plaintextBuffer = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: iv,
+    },
+    key,
+    ciphertext
+  );
+
+  return new Uint8Array(plaintextBuffer);
+}
+
+async function decryptRSA(ciphertext, key) {
+  const plaintextBuffer = await crypto.subtle.decrypt(
+    {
+      name: "RSA-OAEP"
+    },
+    key,
+    ciphertext
+  );
+
+  return new Uint8Array(plaintextBuffer);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
@@ -224,11 +249,58 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Extract archive contents with JSZip
-    const zipArrayBuffer = await artifactArchiveDownloadResponse.arrayBuffer();
-    const zip = await JSZip.loadAsync(zipArrayBuffer);
+    const secureZipArrayBuffer = await artifactArchiveDownloadResponse.arrayBuffer();
+    const secureZip = await JSZip.loadAsync(secureZipArrayBuffer);
+    
+    if (!Object.hasOwn(secureZip.files, 'aes-key.enc')) {
+        console.log("Error: Secure artifact result archive missing aes-key.enc");
+        return;
+        // TODO Implement
+    }
+
+    if (!Object.hasOwn(secureZip.files, 'iv.bin')) {
+        console.log("Error: Secure artifact result archive missing iv.bin");
+        return;
+        // TODO Implement
+    }
+
+    if (!Object.hasOwn(secureZip.files, 'result.zip.enc')) {
+        console.log("Error: Secure artifact result archive missing result.zip.enc");
+        return;
+        // TODO Implement
+    }
+
+    // Decrypt contained AES key using RSA private key
+    const encryptedAESKey = await secureZip.files['aes-key.enc'].async('uint8array');
+    const aesKeyBuffer = await decryptRSA(encryptedAESKey, keyPair.privateKey);
+    const aesKey = await window.crypto.subtle.importKey(
+        'raw',
+        aesKeyBuffer,
+        {
+            name: 'AES-GCM',
+            length: 256,
+        },
+        true,
+        ['encrypt', 'decrypt']
+    );
+    
+    // Use AES key and iv to decrypt result zip
+    const iv = await secureZip.files['iv.bin'].async('uint8array');
+
+    const resultCiphertext = await secureZip.files['result.zip.enc'].async('uint8array');
+    const resultPlaintext = await decryptAES(resultCiphertext, aesKey, iv);
+
+    // Extract contents of result.zip using JSZip
+    const zip = await JSZip.loadAsync(resultPlaintext);
 
     if (!Object.hasOwn(zip.files, 'status.json')) {
         console.log("Error: Artifact result archive missing status.json");
+        return;
+        // TODO Implement
+    }
+
+    if (!Object.hasOwn(zip.files, 'auth-token.txt')) {
+        console.log("Error: Artifact result archive missing auth-token.txt");
         return;
         // TODO Implement
     }
@@ -241,26 +313,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
-    if (!Object.hasOwn(zip.files, 'auth-token.bin')) {
-        console.log("Error: Artifact result archive missing auth-token.bin");
-        return;
-        // TODO Implement
-    }
+    const authToken = await zip.files['auth-token.txt'].async('string');
 
-    const encryptedAccessToken = await zip.files['auth-token.bin'].async('uint8array');
     for (const [filename, entry] of Object.entries(zip.files)) {
         console.log(`File found: ${filename}`);
         // 'string' for text data, or use 'blob' or 'uint8array' for non-text
         const fileData = await entry.async('string');
         console.log(`Data as text: ${fileData}`);
     }
-
-    // Decrypt access token
-    const accessTokenBytes = await window.crypto.subtle.decrypt(
-        {name: 'RSA-OAEP'},
-        keyPair.privateKey,
-        encryptedAccessToken
-    );
-    const accessToken = new TextDecoder().decode(accessTokenBytes);
-    
 });

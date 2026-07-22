@@ -1,7 +1,8 @@
 import { webcrypto } from 'crypto';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { parseArgs } from 'node:util';
 
-async function generateKey() {
+async function generateAESKey() {
   const key = await webcrypto.subtle.generateKey(
     {
       name: 'AES-GCM',
@@ -13,7 +14,6 @@ async function generateKey() {
 
   return key;
 }
-
 
 async function encryptAES(plaintext, key) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -45,20 +45,39 @@ async function encryptRSA(plaintext, key) {
   return new Uint8Array(ciphertext);
 }
 
+const config = {
+  options: {
+    file: { type: 'string', short: 'f' },
+    key: { type: 'string', short: 'k' }
+  },
+  strict: true
+};
+
+
+const { values, _ } = parseArgs(config);
+
+if (!values.file ) {
+  console.log('Missing file argument. Specify with -f <file>');
+  process.exit(1);
+}
+
+if (!values.key ) {
+  console.log('Missing key argument. Specify with -k <key>');
+  process.exit(1);
+}
+
 // Generate AES key
-const aesKey = await generateKey();
+const aesKey = await generateAESKey();
 
 // Load file to encrypt
-const filePath = 'test.txt';
-const fileBuffer = await readFile(filePath);
+const fileBuffer = await readFile(values.file);
 
 // Encrypt file data
 const { ciphertext, iv } = await encryptAES(fileBuffer, aesKey);
 
-// Encrypt AES key and iv with specified RSA public key
-const rsaPublicKeyBase64 = 'fdsafdsa';
-const rsaPublicKeyBuffer = Uint8Array.fromBase64(rsaPublicKeyBase64);
-const rsaPublicKey = await window.crypto.subtle.importKey(
+// Encrypt AES key with specified RSA public key
+const rsaPublicKeyBuffer = Uint8Array.fromBase64(values.key);
+const rsaPublicKey = await webcrypto.subtle.importKey(
   'spki',
   rsaPublicKeyBuffer,
   {
@@ -70,25 +89,10 @@ const rsaPublicKey = await window.crypto.subtle.importKey(
   true,
   ['encrypt']
 );
-
 const aesKeyBuffer = new Uint8Array(await webcrypto.subtle.exportKey('raw', aesKey));
+const encryptedAESKey = await encryptRSA(aesKeyBuffer, rsaPublicKey);
 
-const encryptedAESKey = encryptRSA(aesKeyBuffer, rsaPublicKey);
-const encryptedIV = encryptRSA(iv, rsaPublicKey);
-
-// Test decrypt
-async function decryptAES(ciphertext, key, iv) {
-  const plaintextBuffer = await crypto.subtle.decrypt(
-    {
-      name: "AES-GCM",
-      iv: iv,
-    },
-    key,
-    ciphertext
-  );
-
-  return new Uint8Array(plaintextBuffer);
-}
-
-const decryptedData = await decryptAES(ciphertext, aesKey, iv);
-console.log(new TextDecoder('utf-8').decode(decryptedData));
+// Output encrypted key, iv, and encrypted file data to files
+await writeFile('aes-key.enc', encryptedAESKey);
+await writeFile('iv.bin', iv);
+await writeFile(`${values.file}.enc`, ciphertext);
