@@ -334,9 +334,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setCookie('accessToken', accessToken);
     setCookie('refreshToken', refreshToken);
 
-    console.log(`state: ${state}`);
-    console.log(`originating URL: ${state.originatingUrl}`);
-
     // Redirect user back to where they were when auth flow started
-    //window.location.replace(state.originatingUrl);
+    window.location.replace(state['originatingUrl']);
 });
