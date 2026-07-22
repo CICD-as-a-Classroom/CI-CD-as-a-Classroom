@@ -52,7 +52,7 @@ jobs:
 
           # Encrypt result.zip. Generates result.zip.enc, aes-key.enc, and
           # iv.bin
-          result_encryption_key_base64=$(echo -n "$RESULT_ENCRYPTION_KEY" | tr '-_' '+/')
+          result_encryption_key_base64=$(echo -n "$RESULT_ENCRYPTION_KEY" | tr '_-' '/+')
           node repo/workflow-utils/encrypt.js -f result.zip -k "$result_encryption_key_base64"
           
           # Delete plaintext result.zip, and move output files to result/
