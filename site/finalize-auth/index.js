@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         'authCode': authCode,
         'pkceCodeVerifier': pkceCodeVerifier
     }
-    const zip = dispatchWorkflow('gen-user-auth-tokens-github.yml', workflowInputs);
+    const zip = await dispatchWorkflow('gen-user-auth-tokens-github.yml', workflowInputs);
 
     if (!Object.hasOwn(zip.files, 'result/status.json')) {
         console.log("Error: Artifact result archive missing status.json");
