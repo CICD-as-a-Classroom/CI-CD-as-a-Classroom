@@ -43,7 +43,8 @@ jobs:
 
           # Store results for artifact
           mkdir -p result
-          echo '{"accessToken": "", "refreshToken": "", "accessTokenExpiresInSeconds": 60, "refreshTokenExpiresInSeconds": 120}' > result/data.json echo '{"status": "success"}' > result/status.json
+          echo -n '{"accessToken": "", "refreshToken": "", "accessTokenExpiresInSeconds": 60, "refreshTokenExpiresInSeconds": 120}' > result/data.json
+          echo '{"status": "success"}' > result/status.json
           
           # Zip results for encryption
           zip -r result.zip result/*
