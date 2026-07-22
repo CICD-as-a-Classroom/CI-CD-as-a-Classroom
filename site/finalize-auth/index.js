@@ -97,12 +97,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const data = {
         'ref': 'main',
         'inputs': {
-            //'authCode': authCode,
-            //'pkceCodeVerifier': pkceCodeVerifier,
-            //'authTokenRSAEncryptionKey': publicKeyBase64
-            'authCode': '1234',
-            'pkceCodeVerifier': '1234',
-            'authTokenRSAEncryptionKey': '1234'
+            'authCode': authCode,
+            'pkceCodeVerifier': pkceCodeVerifier,
+            'resultEncryptionKey': publicKeyBase64
         }
     };
     const owner = 'CICD-as-a-Classroom'; // TODO inject from GH repo var
