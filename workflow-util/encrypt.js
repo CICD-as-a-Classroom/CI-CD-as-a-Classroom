@@ -76,7 +76,7 @@ const fileBuffer = await readFile(values.file);
 const { ciphertext, iv } = await encryptAES(fileBuffer, aesKey);
 
 // Encrypt AES key with specified RSA public key
-const rsaPublicKeyBuffer = Buffer.from(base64String, 'base64');
+const rsaPublicKeyBuffer = Buffer.from(values.key, 'base64');
 const rsaPublicKey = await webcrypto.subtle.importKey(
   'spki',
   rsaPublicKeyBuffer,
