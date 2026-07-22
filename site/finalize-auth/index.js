@@ -293,6 +293,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Extract contents of result.zip using JSZip
     const zip = await JSZip.loadAsync(resultPlaintext);
 
+    console.log('Here');
+
     for (const [filename, entry] of Object.entries(zip.files)) {
         console.log(`File found: ${filename}`);
         // 'string' for text data, or use 'blob' or 'uint8array' for non-text
@@ -300,19 +302,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log(`Data as text: ${fileData}`);
     }
 
-    if (!Object.hasOwn(zip.files, 'status.json')) {
+    if (!Object.hasOwn(zip.files, 'result/status.json')) {
         console.log("Error: Artifact result archive missing status.json");
         return;
         // TODO Implement
     }
 
-    if (!Object.hasOwn(zip.files, 'auth-token.txt')) {
+    if (!Object.hasOwn(zip.files, 'result/auth-token.txt')) {
         console.log("Error: Artifact result archive missing auth-token.txt");
         return;
         // TODO Implement
     }
 
-    const statusJson = await zip.files['status.json'].async('string');
+    const statusJson = await zip.files['result/status.json'].async('string');
     const statusObj = JSON.parse(statusJson);
     if (statusObj.status != 'success') {
         console.log(`Error: Artifact result archive reported non-success status "${statusObj.status}"`);
@@ -320,5 +322,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
-    const authToken = await zip.files['auth-token.txt'].async('string');
+    const authToken = await zip.files['result/auth-token.txt'].async('string');
 });
