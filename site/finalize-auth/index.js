@@ -79,34 +79,8 @@ async function decryptRSA(ciphertext, key) {
   return new Uint8Array(plaintextBuffer);
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const authCode = urlParams.get('code');
-    const echoedState = urlParams.get('state');
-
-    const stateBase64 = getCookie('stateBase64');
-
-    // TODO error-handle for missing cookies
-    
-    if (echoedState !== stateBase64) {
-        console.log('Error. Echoed state does not match.');
-        // TODO implement
-        return;
-    }
-
-    const state = new TextDecoder().decode(
-        Uint8Array.fromBase64(
-            stateBase64,
-            { alphabet: 'base64url' }
-        )
-    );
-
-    const pkceCodeVerifier = getCookie('pkceCodeVerifier');
-
-    // TODO error-handle for missing cookies
-
-    // Generate RSA key pair for securing workflow dispatch results (so that
-    // only this browser session can view the produced user oauth access token)
+async function dispatchWorkflow(workflowID, workflowInputs) {
+    // Generate RSA key pair for securing workflow dispatch results
     const keyPair = await generateRSAKeys();
 
     // Export public key to SPKI format, then convert to Base64
@@ -114,18 +88,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     const publicKeyBase64 =
         new Uint8Array(exportedPublic)
         .toBase64({ alphabet: 'base64url', omitPadding: true });
-    // const pemPublic = `-----BEGIN PUBLIC KEY-----\n${publicKeyBase64}\n-----END PUBLIC KEY-----`;
-
-    // TODO dispatch CI/CD workflow to finalize auth flow and generate
-    // encrypted access token
+    
     // TODO delete mock data, uncomment real data
+    
+    if (!workflowInputs) {
+        workflowInputs = {};
+    }
+    workflowInputs['resultEncryptionKey'] = publicKeyBase64;
     const data = {
         'ref': 'main',
-        'inputs': {
-            'authCode': authCode,
-            'pkceCodeVerifier': pkceCodeVerifier,
-            'resultEncryptionKey': publicKeyBase64
-        }
+        'inputs': workflowInputs
     };
     const owner = 'CICD-as-a-Classroom'; // TODO inject from GH repo var
     const repo = 'CI-CD-as-a-Classroom'; // TODO inject from GH repo var
@@ -136,7 +108,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     dispatch_token += '11AINDF5Y0mtIaO1OpgPAs_6QKAga2FF'
     dispatch_token += 'XUsXv8ARf2H7W6AP61R9C4LQfakeGRU8dKZI2YYG6ZHDAd8DTB'
     const response = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/actions/workflows/gen-user-auth-token-github.yml/dispatches`,
+        `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowID}/dispatches`,
         {
             method: 'POST',
             headers: {
@@ -194,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } while (runConclusion === null);
 
     if (runConclusion !== 'success') {
-        console.log(`Error: Auth workflow run failed. Got conclusion ${runConclusion} and status ${runStatus}`);
+        console.log(`Error: Workflow run failed. Got conclusion ${runConclusion} and status ${runStatus}`);
         return;
         // TODO implement
     }
@@ -290,17 +262,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     const resultCiphertext = await secureZip.files['result.zip.enc'].async('uint8array');
     const resultPlaintext = await decryptAES(resultCiphertext, aesKey, iv);
 
-    // Extract contents of result.zip using JSZip
+    // Extract contents of result.zip using JSZip and return it
     const zip = await JSZip.loadAsync(resultPlaintext);
 
-    console.log('Here');
+    return zip;
+}
 
-    for (const [filename, entry] of Object.entries(zip.files)) {
-        console.log(`File found: ${filename}`);
-        // 'string' for text data, or use 'blob' or 'uint8array' for non-text
-        const fileData = await entry.async('string');
-        console.log(`Data as text: ${fileData}`);
+document.addEventListener('DOMContentLoaded', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const authCode = urlParams.get('code');
+    const echoedState = urlParams.get('state');
+
+    const stateBase64 = getCookie('stateBase64');
+
+    // TODO error-handle for missing cookies
+    
+    if (echoedState !== stateBase64) {
+        console.log('Error. Echoed state does not match.');
+        // TODO implement
+        return;
     }
+
+    const state = new TextDecoder().decode(
+        Uint8Array.fromBase64(
+            stateBase64,
+            { alphabet: 'base64url' }
+        )
+    );
+
+    const pkceCodeVerifier = getCookie('pkceCodeVerifier');
+
+    // TODO error-handle for missing cookies
+
+    // Dispatch backend workflow to complete auth flow.
+    const workflowInputs = {
+        'authCode': authCode,
+        'pkceCodeVerifier': pkceCodeVerifier
+    }
+    const zip = dispatchWorkflow('gen-user-auth-tokens-github.yml', workflowInputs);
 
     if (!Object.hasOwn(zip.files, 'result/status.json')) {
         console.log("Error: Artifact result archive missing status.json");
@@ -308,8 +307,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO Implement
     }
 
-    if (!Object.hasOwn(zip.files, 'result/auth-token.txt')) {
-        console.log("Error: Artifact result archive missing auth-token.txt");
+    if (!Object.hasOwn(zip.files, 'result/access-token.txt')) {
+        console.log("Error: Artifact result archive missing access-token.txt");
+        return;
+        // TODO Implement
+    }
+
+    if (!Object.hasOwn(zip.files, 'result/refresh-token.txt')) {
+        console.log("Error: Artifact result archive missing refresh-token.txt");
         return;
         // TODO Implement
     }
@@ -322,5 +327,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO implement
     }
 
-    const authToken = await zip.files['result/auth-token.txt'].async('string');
+    const accessToken = await zip.files['result/access-token.txt'].async('string');
+    const refreshToken = await zip.files['result/refresh-token.txt'].async('string');
+
+    // Store access token and refresh token in cookies
+    setCookie('accessToken', accessToken);
+    setCookie('refreshToken', refreshToken);
+
+    // Redirect user back to where they were when auth flow started
+    window.location.replace(state.originatingUrl);
 });
