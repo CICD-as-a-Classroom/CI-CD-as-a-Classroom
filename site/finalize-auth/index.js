@@ -338,5 +338,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log(`originating URL: ${state.originatingUrl}`);
 
     // Redirect user back to where they were when auth flow started
-    window.location.replace(state.originatingUrl);
+    //window.location.replace(state.originatingUrl);
 });
