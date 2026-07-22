@@ -283,12 +283,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
-    const state = new TextDecoder().decode(
-        Uint8Array.fromBase64(
-            stateBase64,
-            { alphabet: 'base64url' }
+    const state = JSON.parse(
+        new TextDecoder().decode(
+            Uint8Array.fromBase64(
+                stateBase64,
+                { alphabet: 'base64url' }
+            )
         )
-    );
+    )
 
     const pkceCodeVerifier = getCookie('pkceCodeVerifier');
 
@@ -334,9 +336,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     setCookie('accessToken', accessToken);
     setCookie('refreshToken', refreshToken);
 
-    console.log(state);
-    console.log(state['originatingUrl']);
-
     // Redirect user back to where they were when auth flow started
-    // window.location.replace(state['originatingUrl']);
+    window.location.replace(state.originatingUrl);
 });
