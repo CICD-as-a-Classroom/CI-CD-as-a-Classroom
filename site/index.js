@@ -1,3 +1,5 @@
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 function setCookie(name, value, path, maxAgeSeconds, sameSite, allowInsecure) {
     if (!path) {
         path = '/';
@@ -43,6 +45,46 @@ async function sha256(message) {
     const msgBuffer = new TextEncoder().encode(message);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     return new Uint8Array(hashBuffer);
+}
+
+async function generateRSAKeys() {
+    const keyPair = await window.crypto.subtle.generateKey(
+        {
+            name: "RSA-OAEP",
+            modulusLength: 2048,
+            publicExponent: new Uint8Array([1, 0, 1]), // Equivalent to 65537
+            hash: "SHA-256",
+        },
+        true,
+        ["encrypt", "decrypt"]
+    );
+
+    return keyPair
+}
+
+async function decryptAES(ciphertext, key, iv) {
+  const plaintextBuffer = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: iv,
+    },
+    key,
+    ciphertext
+  );
+
+  return new Uint8Array(plaintextBuffer);
+}
+
+async function decryptRSA(ciphertext, key) {
+  const plaintextBuffer = await crypto.subtle.decrypt(
+    {
+      name: "RSA-OAEP"
+    },
+    key,
+    ciphertext
+  );
+
+  return new Uint8Array(plaintextBuffer);
 }
 
 async function dispatchWorkflow(workflowID, workflowInputs) {
