@@ -85,7 +85,7 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
 
     // Export public key to SPKI format, then convert to Base64
     const exportedPublic = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-    const publicKeyBase64 =
+    const publicKeyBase64url =
         new Uint8Array(exportedPublic)
         .toBase64({ alphabet: 'base64url', omitPadding: true });
     
@@ -94,7 +94,7 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
     if (!workflowInputs) {
         workflowInputs = {};
     }
-    workflowInputs['resultEncryptionKey'] = publicKeyBase64;
+    workflowInputs['resultEncryptionKey'] = publicKeyBase64url;
     const data = {
         'ref': 'main',
         'inputs': workflowInputs
@@ -271,13 +271,14 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
+    console.log(`Auth code: ${authCode}`);
     const echoedState = urlParams.get('state');
 
-    const stateBase64 = getCookie('stateBase64');
+    const stateBase64url = getCookie('stateBase64url');
 
     // TODO error-handle for missing cookies
     
-    if (echoedState !== stateBase64) {
+    if (echoedState !== stateBase64url) {
         console.log('Error. Echoed state does not match.');
         // TODO implement
         return;
@@ -286,13 +287,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const state = JSON.parse(
         new TextDecoder().decode(
             Uint8Array.fromBase64(
-                stateBase64,
+                stateBase64url,
                 { alphabet: 'base64url' }
             )
         )
     )
 
     const pkceCodeVerifier = getCookie('pkceCodeVerifier');
+    console.log(`Code verifier: ${pkceCodeVerifier}`);
 
     // TODO error-handle for missing cookies
 

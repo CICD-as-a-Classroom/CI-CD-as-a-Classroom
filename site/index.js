@@ -58,13 +58,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             randomToken: randomStateToken,
             originatingUrl: window.location.href
         };
-        const stateBase64 =
+        const stateBase64url =
             new TextEncoder().encode(JSON.stringify(state))
             .toBase64({ alphabet: 'base64url', omitPadding: true });
         
-        setCookie('stateBase64', stateBase64, '/', 3600);
+        setCookie('stateBase64url', stateBase64url, '/', 3600);
         
-        window.location.replace(`https://github.com/login/oauth/authorize?client_id=${authClientId}&state=${stateBase64}&code_challenge=${pkceCodeChallenge}&code_challenge_method=S256`)
+        window.location.replace(`https://github.com/login/oauth/authorize?client_id=${authClientId}&state=${stateBase64url}&code_challenge=${pkceCodeChallenge}&code_challenge_method=S256`)
 
         return;
     }

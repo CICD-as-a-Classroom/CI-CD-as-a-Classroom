@@ -31,7 +31,9 @@ jobs:
       - name: Generate user auth tokens
         run: |
           # Mask auth code and code verifier in logs
-          echo "::add-mask::$AUTH_CODE"
+          echo "AUTH CODE:"
+          echo "$AUTH_CODE" # TODO remove
+          #echo "::add-mask::$AUTH_CODE" # TODO uncomment
           echo "::add-mask::$PKCE_CODE_VERIFIER"
 
           # TODO Retrieve auth tokens via cURL request
