@@ -115,6 +115,7 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
     dispatch_token += 't_'
     dispatch_token += '11AINDF5Y0mtIaO1OpgPAs_6QKAga2FF'
     dispatch_token += 'XUsXv8ARf2H7W6AP61R9C4LQfakeGRU8dKZI2YYG6ZHDAd8DTB'
+    console.log(data);
     const response = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowID}/dispatches`,
         {
