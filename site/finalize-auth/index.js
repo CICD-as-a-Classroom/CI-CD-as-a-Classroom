@@ -279,7 +279,6 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const authCode = urlParams.get('code');
-    console.log(`Auth code: ${authCode}`);
     const echoedState = urlParams.get('state');
 
     const stateBase64url = getCookie('stateBase64url');
@@ -302,7 +301,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     )
 
     const pkceCodeVerifier = getCookie('pkceCodeVerifier');
-    console.log(`Code verifier: ${pkceCodeVerifier}`);
 
     // TODO error-handle for missing cookies
 
