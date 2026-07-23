@@ -335,6 +335,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseData = JSON.parse(responseDataJson);
 
     // Store access token, refresh token, and token expirations in cookies
+    console.log(`Access token: ${responseData.accessToken}`)
     setCookie('accessToken', responseData.accessToken);
     setCookie('refreshToken', responseData.refreshToken);
     if (responseData.accessTokenExpiresInSeconds !== null) {
@@ -357,5 +358,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     // Redirect user back to where they were when auth flow started
-    window.location.replace(state.originatingUrl);
+    // window.location.replace(state.originatingUrl);
 });
