@@ -14,8 +14,8 @@ on:
         required: true
   
 env:
-  AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
-  AUTH_CLIENT_SECRET: ${{ secrets.AUTH_CLIENT_SECRET }}
+  AUTH_APP_ID: ${{ vars.AUTH_APP_ID }}
+  AUTH_APP_SECRET: ${{ secrets.AUTH_APP_SECRET }}
   AUTH_CODE: ${{ inputs.authCode }}
   PKCE_CODE_VERIFIER: ${{ inputs.pkceCodeVerifier }}
   RESULT_ENCRYPTION_KEY: ${{ inputs.resultEncryptionKey }}
@@ -38,8 +38,8 @@ jobs:
 
           # TODO Retrieve auth tokens via cURL request
           auth_results=$(curl -X POST -G "https://github.com/login/oauth/access_token" \
-            -d "client_id=$AUTH_CLIENT_ID" \
-            -d "client_secret=$AUTH_CLIENT_SECRET" \
+            -d "client_id=$AUTH_APP_ID" \
+            -d "client_secret=$AUTH_APP_SECRET" \
             -d "code=$AUTH_CODE" \
             -d "code_verifier=$PKCE_CODE_VERIFIER")
 
