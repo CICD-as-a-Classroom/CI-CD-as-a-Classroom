@@ -69,6 +69,8 @@ jobs:
 
           # Replace forbidden characters with hyphens
           student_assignment_repo=$(echo -n "$student_assignment_repo" | sed 's/[^a-zA-Z0-9_\.-]/-/g')
+
+          echo '{"name":"'"$student_assignment_repo"'","description":"'"${username}'s"' repository for assignment '"$ASSIGNMENT_NAME"'","private":true}'
           
           # Create remote student assignment repo
           create_remote_repo_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
