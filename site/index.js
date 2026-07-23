@@ -129,6 +129,9 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
     );
     if (!response.ok) {
         console.log("Error: Failed to dispatch workflow");
+        console.log(response.status);
+        const responseData = await response.json();
+        console.log(responseData);
         return;
         // TODO implement
     }
