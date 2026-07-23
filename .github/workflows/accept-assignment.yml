@@ -18,12 +18,12 @@ on:
 env:
   ASSIGNMENT_READ_USERNAME: ${{ vars.ASSIGNMENT_READ_USERNAME }}
   ASSIGNMENT_READ_TOKEN: ${{ secrets.ASSIGNMENT_READ_TOKEN }}
-  ASSIGNMENT_REPO: ${{ vars.ASSIGNMENT_REPO || github.repository }}
+  ASSIGNMENT_REPO: ${{ vars.ASSIGNMENT_REPO }}
   STUDENT_PLATFORM: ${{ vars.STUDENT_PLATFORM || 'github' }}
   STUDENT_PLATFORM_GIT_HOSTNAME: ${{ vars.STUDENT_PLATFORM_GIT_HOSTNAME }}
   STUDENT_ASSIGNMENT_ORGANIZATION: ${{ vars.STUDENT_ASSIGNMENT_ORGANIZATION }}
-  STUDENT_ASSIGNMENT_WRITE_USERNAME: ${{ vars.ASSIGNMENT_WRITE_USERNAME }}
-  STUDENT_ASSIGNMENT_WRITE_TOKEN: ${{ secrets.ASSIGNMENT_WRITE_TOKEN }}
+  STUDENT_ASSIGNMENT_WRITE_USERNAME: ${{ vars.STUDENT_ASSIGNMENT_WRITE_USERNAME }}
+  STUDENT_ASSIGNMENT_WRITE_TOKEN: ${{ secrets.STUDENT_ASSIGNMENT_WRITE_TOKEN }}
   USER_ACCESS_TOKEN: ${{ inputs.userAccessToken }}
   ASSIGNMENT_NAME: ${{ inputs.assignmentName }}
   ASSIGNMENT_ACCEPT_KEY: ${{ inputs.assignmentAcceptKey }}
@@ -39,6 +39,11 @@ jobs:
           path: 'repo'
       - name: Accept assignment
         run: |
+          if [[ "$ASSIGNMENT_REPO" == "" ]]
+          then
+              ASSIGNMENT_REPO="github.com/${{ github.repository }}.git"
+          fi
+
           if [[ "$STUDENT_PLATFORM" == "github" ]]
           then
               STUDENT_PLATFORM_GIT_HOSTNAME="github.com"
