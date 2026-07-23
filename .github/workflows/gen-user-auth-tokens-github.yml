@@ -35,16 +35,20 @@ jobs:
           echo "::add-mask::$PKCE_CODE_VERIFIER"
 
           # TODO Retrieve auth tokens via cURL request
-          #curl -X POST -G "https://github.com/login/oauth/access_token" \
-          #  -d "client_id=$AUTH_CLIENT_ID" \
-          #  -d "client_secret=$AUTH_CLIENT_SECRET" \
-          #  -d "code=$AUTH_CODE" \
-          #  -d "code_verifier=$PKCE_CODE_VERIFIER"
+          auth_results=$(curl -X POST -G "https://github.com/login/oauth/access_token" \
+            -d "client_id=$AUTH_CLIENT_ID" \
+            -d "client_secret=$AUTH_CLIENT_SECRET" \
+            -d "code=$AUTH_CODE" \
+            -d "code_verifier=$PKCE_CODE_VERIFIER")
+
+          echo "RESULTS"
+          echo "$auth_results"
+          echo "END RESULTS"
 
           # Store results for artifact
           mkdir -p result
           echo -n '{"accessToken": "", "refreshToken": "", "accessTokenExpiresInSeconds": 60, "refreshTokenExpiresInSeconds": 120}' > result/data.json
-          echo '{"status": "success"}' > result/status.json
+          echo -n '{"status": "success"}' > result/status.json
           
           # Zip results for encryption
           zip -r result.zip result/*
