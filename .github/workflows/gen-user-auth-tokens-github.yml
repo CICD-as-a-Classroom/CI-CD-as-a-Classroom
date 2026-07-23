@@ -37,11 +37,11 @@ jobs:
           echo "::add-mask::$PKCE_CODE_VERIFIER"
 
           # TODO Retrieve auth tokens via cURL request
-          auth_results=$(curl -X POST -G "https://github.com/login/oauth/access_token" \
-            -d "client_id=$AUTH_APP_ID" \
-            -d "client_secret=$AUTH_APP_SECRET" \
-            -d "code=$AUTH_CODE" \
-            -d "code_verifier=$PKCE_CODE_VERIFIER")
+          auth_results=$(curl -X POST -H "Accept: application/json" "https://github.com/login/oauth/access_token" \
+            --url-query "client_id=$AUTH_APP_ID" \
+            --url-query "client_secret=$AUTH_APP_SECRET" \
+            --url-query "code=$AUTH_CODE" \
+            --url-query "code_verifier=$PKCE_CODE_VERIFIER")
 
           echo "RESULTS"
           echo "$auth_results"

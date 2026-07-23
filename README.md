@@ -6,7 +6,7 @@ If this repository is being used as the CI/CD backend and is hosted on GitHub,
 the following repository variables and secrets must be configured in GitHub:
 
 - Secrets:
-  - `AUTH_CLIENT_SECRET`: The client secret key used to finalize student
+  - `AUTH_APP_SECRET`: The client secret key used to finalize student
     authentication flows (e.g., via GitLab's OAuth flow or GitHub Apps).
   - `ASSIGNMENT_READ_TOKEN`: The access token that will be used to read
     assignment repository when accepting assignments for
@@ -18,7 +18,7 @@ the following repository variables and secrets must be configured in GitHub:
     access token with necessary and sufficient permissions to read the
     assignment repository (project).
 - Variables:
-  - `AUTH_CLIENT_ID`: The client ID used to conduct student authentication
+  - `AUTH_APP_ID`: The client ID used to conduct student authentication
     flows (e.g., via GitLab's OAuth flow or GitHub Apps).
   - `ASSIGNMENT_READ_USERNAME`: The username associated with the access token
     that will be used to read the assignment repository when
