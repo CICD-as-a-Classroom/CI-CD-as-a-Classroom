@@ -284,12 +284,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     refreshToken = getCookie('refreshToken');
     accessToken = getCookie('accessToken');
 
+    if (accessToken == "") {
+        accessToken = null;
+    }
+    if (refreshToken == "") {
+        refreshToken = null;
+    }
+
     // TODO Check if access token is expired. If so, check if refresh
     // token is expired. If so, delete both auth token cookies and start auth
     // flow below. If refresh token is
     // still fresh, use it to generate new access token instead of rerunning
     // entire auth flow.
 
+    // Auth flow
     if (refreshToken === null || accessToken === null) {
         // Not logged in. Redirect browser to GitHub App login.
         

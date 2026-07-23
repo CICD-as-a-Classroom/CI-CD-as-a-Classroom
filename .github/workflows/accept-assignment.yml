@@ -92,7 +92,7 @@ jobs:
           # Create local student assignment repo and push contents to remote
           # repo
           mkdir -p "$student_assignment_repo"
-          cp -R assignments-repo/"$ASSIGNMENT_NAME"/* "$student_assignment_repo"
+          cp -R assignments-repo/assignments/"$ASSIGNMENT_NAME"/* "$student_assignment_repo"
           (
               cd "$student_assignment_repo"
               git init -b main
