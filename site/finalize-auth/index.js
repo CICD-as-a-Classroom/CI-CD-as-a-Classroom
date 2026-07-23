@@ -5,7 +5,11 @@ function setCookie(name, value, path, maxAgeSeconds, sameSite, allowInsecure) {
         path = '/';
     }
 
-    let cookieStr = encodeURIComponent(name) + '=' + encodeURIComponent(value) + `; path=${path}`;
+    let cookieStr = encodeURIComponent(name) + '=';
+    if (value !== null) {
+        cookieStr += encodeURIComponent(value);
+    }
+    cookieStr += `; path=${path}`;
     if (maxAgeSeconds) {
         cookieStr += `; max-age=${maxAgeSeconds}`;
     }
@@ -24,6 +28,10 @@ function getCookie(name) {
         return decodeURIComponent(parts.pop().split(';').shift());
     }
     return null;
+}
+
+function deleteCookie(name, path, sameSite, allowInsecure) {
+    setCookie(name, null, path, 0, sameSite, allowInsecure);
 }
 
 function generateSecureString(length) {
@@ -328,20 +336,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseDataJson = await zip.files['result/data.json'].async('string');
     const responseData = JSON.parse(responseDataJson);
 
-    const accessTokenExpiration = new Date();
-    accessTokenExpiration.setSeconds(
-        accessTokenExpiration.getSeconds() + responseData.accessTokenExpiresInSeconds
-    );
-    const refreshTokenExpiration = new Date();
-    refreshTokenExpiration.setSeconds(
-        refreshTokenExpiration.getSeconds() + responseData.refreshTokenExpiresInSeconds
-    );
-
-    // Store access token, refresh token, and access token expiration in cookies
+    // Store access token, refresh token, and token expirations in cookies
     setCookie('accessToken', responseData.accessToken);
     setCookie('refreshToken', responseData.refreshToken);
-    setCookie('accessTokenExpiration', accessTokenExpiration.toISOString());
-    setCookie('refreshTokenExpiration', refreshTokenExpiration.toISOString());
+    if (responseData.accessTokenExpiresInSeconds !== null) {
+        const accessTokenExpiration = new Date();
+        accessTokenExpiration.setSeconds(
+            accessTokenExpiration.getSeconds() + responseData.accessTokenExpiresInSeconds
+        );
+        setCookie('accessTokenExpiration', accessTokenExpiration.toISOString());
+    } else {
+        deleteCookie('accessTokenExpiration');
+    }
+    if (responseData.refreshTokenExpiresInSeconds !== null) {
+        const refreshTokenExpiration = new Date();
+        refreshTokenExpiration.setSeconds(
+            refreshTokenExpiration.getSeconds() + responseData.refreshTokenExpiresInSeconds
+        );
+        setCookie('refreshTokenExpiration', refreshTokenExpiration.toISOString());
+    } else {
+        deleteCookie('refreshTokenExpiration');
+    }
 
     // Redirect user back to where they were when auth flow started
     window.location.replace(state.originatingUrl);

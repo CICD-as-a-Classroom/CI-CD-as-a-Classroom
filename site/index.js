@@ -3,7 +3,11 @@ function setCookie(name, value, path, maxAgeSeconds, sameSite, allowInsecure) {
         path = '/';
     }
 
-    let cookieStr = encodeURIComponent(name) + '=' + encodeURIComponent(value) + `; path=${path}`;
+    let cookieStr = encodeURIComponent(name) + '=';
+    if (value !== null) {
+        cookieStr += encodeURIComponent(value);
+    }
+    cookieStr += `; path=${path}`;
     if (maxAgeSeconds) {
         cookieStr += `; max-age=${maxAgeSeconds}`;
     }
@@ -22,6 +26,10 @@ function getCookie(name) {
         return decodeURIComponent(parts.pop().split(';').shift());
     }
     return null;
+}
+
+function deleteCookie(name, path, sameSite, allowInsecure) {
+    setCookie(name, null, path, 0, sameSite, allowInsecure);
 }
 
 function generateSecureString(length) {

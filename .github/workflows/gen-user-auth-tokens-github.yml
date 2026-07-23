@@ -31,25 +31,35 @@ jobs:
       - name: Generate user auth tokens
         run: |
           # Mask auth code and code verifier in logs
-          echo "AUTH CODE:"
-          echo "$AUTH_CODE" # TODO remove
-          #echo "::add-mask::$AUTH_CODE" # TODO uncomment
+          echo "::add-mask::$AUTH_CODE"
           echo "::add-mask::$PKCE_CODE_VERIFIER"
 
-          # TODO Retrieve auth tokens via cURL request
+          # Retrieve auth tokens via cURL request
           auth_results=$(curl -X POST -H "Accept: application/json" "https://github.com/login/oauth/access_token" \
             --url-query "client_id=$AUTH_APP_ID" \
             --url-query "client_secret=$AUTH_APP_SECRET" \
             --url-query "code=$AUTH_CODE" \
             --url-query "code_verifier=$PKCE_CODE_VERIFIER")
 
-          echo "RESULTS"
-          echo "$auth_results"
-          echo "END RESULTS"
+          access_token=$(echo "$auth_results" | jq '.access_token')
+          refresh_token=$(echo "$auth_results" | jq '.refresh_token')
+          access_token_expires_in=$(echo "$auth_results" | jq '.expires_in')
+          refresh_token_expires_in=$(echo "$auth_results" | jq '.refresh_token_expires_in')
+
+          # Mask tokens in logs
+          echo "::add-mask::$access_token"
+          echo "::add-mask::$refresh_token"
+
+          # Test masking # TODO remove
+          echo "MASKED VALUES"
+          echo "$AUTH_CODE"
+          echo "$PKCE_CODE_VERIFIER"
+          echo "$access_token"
+          echo "$refresh_token"
 
           # Store results for artifact
           mkdir -p result
-          echo -n '{"accessToken": "", "refreshToken": "", "accessTokenExpiresInSeconds": 60, "refreshTokenExpiresInSeconds": 120}' > result/data.json
+          echo -n '{"accessToken": '"$access_token"', "refreshToken": '"$refresh_token"', "accessTokenExpiresInSeconds": '"$access_token_expires_in"', "refreshTokenExpiresInSeconds": '"$refresh_token_expires_in"'}' > result/data.json
           echo -n '{"status": "success"}' > result/status.json
           
           # Zip results for encryption
