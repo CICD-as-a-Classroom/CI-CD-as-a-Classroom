@@ -138,7 +138,7 @@ jobs:
               # Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
               if [[ -f "assignments-repo/assignments/assignments.conf" ]]
               then
-                  assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq -r '.[] | select(.name == "'"$ASSIGNMENT_NAME"'") | [.][0].key')
+                  assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rs 'if length > 0 then .[0].key else "" end')
                   if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
                   then
                       # Invalid assignment accept key. Return error to client.
