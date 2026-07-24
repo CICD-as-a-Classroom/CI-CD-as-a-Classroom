@@ -51,6 +51,10 @@ jobs:
 
           # Mask user access token and assignment accept key in logs
           echo "::add-mask::$USER_ACCESS_TOKEN"
+
+          # Git config
+          git config --global user.name "Classroom Robot"
+          git config --global user.email "<>"
           
           # Clone assignment repo
           git clone "https://${ASSIGNMENT_READ_USERNAME}:${ASSIGNMENT_READ_TOKEN}@${ASSIGNMENT_REPO}" assignments-repo
@@ -103,7 +107,7 @@ jobs:
           (
               cd "$student_assignment_repo"
               git init -b main
-              git commit -am "Robot: Instantiate assignment"
+              git commit -am "Classroom Robot: Instantiate assignment"
               remote_repo_git_url="https://${STUDENT_ASSIGNMENT_WRITE_USERNAME}:${STUDENT_ASSIGNMENT_WRITE_TOKEN}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}.git"
               git push "$remote_repo_git_url" main
           )
