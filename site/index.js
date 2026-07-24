@@ -358,18 +358,26 @@ document.addEventListener('DOMContentLoaded', async () => {
         // TODO Implement
     }
 
+    const statusJson = await zip.files['result/status.json'].async('string');
+    const statusObj = JSON.parse(statusJson);
+    if (statusObj.status == 'unknown-assignment') {
+        console.log(`Assignment "${assignmentName}" not found.`);
+        return;
+        // TODO implement
+    } else if (statusObj.status == 'invalid-key') {
+        console.log(`Incorrect assignment key "${assignmentAcceptKey}".`);
+        return;
+        // TODO implement
+    } else if (statusObj.status != 'success') {
+        console.log(`Error: Artifact result archive reported non-success status "${statusObj.status}"`);
+        return;
+        // TODO implement
+    }
+
     if (!Object.hasOwn(zip.files, 'result/data.json')) {
         console.log("Error: Artifact result archive missing data.json");
         return;
         // TODO Implement
-    }
-
-    const statusJson = await zip.files['result/status.json'].async('string');
-    const statusObj = JSON.parse(statusJson);
-    if (statusObj.status != 'success') {
-        console.log(`Error: Artifact result archive reported non-success status "${statusObj.status}"`);
-        return;
-        // TODO implement
     }
 
     const responseDataJson = await zip.files['result/data.json'].async('string');
