@@ -118,7 +118,7 @@ jobs:
                   then
                       assignment_exists=0
                   else
-                      n_matching_assignments=$(cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -s 'length')
+                      n_matching_assignments=$(cat "assignments-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -s 'length')
                       if [[ "$n_matching_assignments" == 0 ]]
                       then
                           assignment_exists=0
@@ -138,9 +138,7 @@ jobs:
               # Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
               if [[ -f "assignments-repo/assignments/assignments.conf" ]]
               then
-                  echo here
-                  cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")'
-                  assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rs 'if length > 0 then .[0].key else "" end')
+                  assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rs 'if length > 0 then .[0].key else "" end')
                   if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
                   then
                       # Invalid assignment accept key. Return error to client.
