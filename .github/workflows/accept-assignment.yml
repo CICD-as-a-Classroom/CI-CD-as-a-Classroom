@@ -126,10 +126,6 @@ jobs:
               -H "X-GitHub-Api-Version: 2026-03-10" \
               "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}/collaborators/${username}" \
               -d '{"permission":"push"}')
-          
-          echo "Status: $add_collaborator_status"
-          echo "Results:"
-          cat curl.json
 
           if [[ "$add_collaborator_status" == "403" ]]
           then
@@ -161,7 +157,7 @@ jobs:
           elif [[ "$add_collaborator_status" == "204" ]]
           then
               # Student added directly as collaborator (no invite was needed)
-              student_repository_url=$(cat curl.json | jq -r '.repository.html_url')
+              student_repository_url="https://${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}"
           else
               echo "Error: Got HTTP status $add_collaborator_status when adding student as collaborator to their assignment repository" >&2
               exit 1

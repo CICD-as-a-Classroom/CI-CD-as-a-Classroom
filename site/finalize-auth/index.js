@@ -138,8 +138,8 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
     const responseData = await response.json();
     const runURL = responseData['run_url'];
 
-    // Wait three seconds, then poll workflow run every two seconds until done.    
-    await sleep(3000);
+    // Wait 0.5 seconds, then poll workflow run every two seconds until done.    
+    await sleep(500);
     let runStatus = null;
     let runConclusion = null;
     let pollResponseData;
