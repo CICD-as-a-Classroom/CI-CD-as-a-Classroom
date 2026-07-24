@@ -365,7 +365,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
         // TODO implement
     } else if (statusObj.status == 'invalid-key') {
-        console.log(`Incorrect assignment key "${assignmentAcceptKey}".`);
+        if (assignmentAcceptKey !== null) {
+            console.log(`Incorrect assignment accept key "${assignmentAcceptKey}".`);
+        } else {
+            console.log(`Missing assignment accept key.`);
+        }
         return;
         // TODO implement
     } else if (statusObj.status != 'success') {
