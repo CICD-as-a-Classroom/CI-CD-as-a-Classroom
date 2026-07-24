@@ -333,8 +333,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     loadingContent.style.display = 'none';
     acceptAssignmentContent.style.display = 'block';
 
-    // TODO Check to see if user's repository exists. Use GitHub rest API
-    // repository endpoint. If it exists, simply give them a link to it.
+    // TODO Check to see if user's repository exists and user has write access.
+    // Use GitHub rest API repository endpoint. If it exists and user has write
+    // access, either redirect them to the repo page or present a link to the
+    // repo page.
 
     // TODO Otherwise, dispatch backend workflow to accept assignment.
 
@@ -368,5 +370,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const responseDataJson = await zip.files['result/data.json'].async('string');
     const responseData = JSON.parse(responseDataJson);
 
-    console.log(`responseData: ${responseData}`);
+    // Perhaps we should present a link to the repo page and let the user
+    // navigate to it themselves
+    window.location.replace(responseData.repositoryURL);
 });
