@@ -8,30 +8,51 @@ body {
 	line-height: 1.8rem;
 }
 
-#main-col-container {
-	width: 50vw;
-	min-width: 50rem;
-	margin-left: auto;
-	margin-right: auto;
+#viewport-container {
+	width: 1vw;
+	height: 1vh;
+	display: flex;
+	align-items: center;
 }
 
-#main-col {
-	max-width: 95vw;
-	margin-left: auto;
-	margin-right: auto;
-}
-
-#loading-content {
-	width: 10rem;
-	max-width: 100%;
-	background-color: #000000ff;
+#loader-container {
+	width: 0.2vw;
+	min-width: 10rem;
 	aspect-ratio: 1;
 	margin-left: auto;
 	margin-right: auto;
+	display: flex;
+	align-items: center;
 }
 
 #accept-assignment-content {
 	display: none;
 	margin-left: auto;
 	margin-right: auto;
+}
+
+/*
+ * Modified from #1 at https://css-loaders.com/glowing/
+ */
+.loader {
+  max-width: 0.7vw;
+  aspect-ratio: 1;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 10px;
+  border-radius: 50%;
+  box-sizing: border-box;
+  position: relative;
+  mask: conic-gradient(#000 0 0) content-box exclude,conic-gradient(#000 0 0);
+  filter: blur(12px);
+}
+.loader:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-conic-gradient(#0000 0 5%,#C02942,#0000 20% 50%);
+  animation: l2 1.5s linear infinite;
+}
+@keyframes l2 {
+  to {rotate: 1turn}
 }
