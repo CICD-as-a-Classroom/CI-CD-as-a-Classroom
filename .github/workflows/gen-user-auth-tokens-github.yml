@@ -30,6 +30,12 @@ jobs:
           path: 'repo'
       - name: Generate user auth tokens
         run: |
+          # TODO Make all curl operations retrieve http status, sending outputs
+          # to file. Then error-handle on http status.
+          
+          # TODO defaults for env vars, and error-handle for missing
+          # required vars / secrets
+          
           # Mask auth code and code verifier in logs
           echo "::add-mask::$AUTH_CODE"
           echo "::add-mask::$PKCE_CODE_VERIFIER"

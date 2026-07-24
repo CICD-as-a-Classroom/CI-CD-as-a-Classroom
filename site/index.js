@@ -277,6 +277,10 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const assignmentName = urlParams.get('assignment-name');
+    const assignmentAcceptKey = urlParams.get('assignment-accept-key');
+    
     refreshToken = getCookie('refreshToken');
     accessToken = getCookie('accessToken');
 
@@ -336,10 +340,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // TODO Otherwise, dispatch backend workflow to accept assignment.
 
-    const workflowInputs = {
+    let workflowInputs = {
         'userAccessToken': accessToken,
-        'assignmentName': 'assignment-1', // TODO extract from 'assignment-name' query parameter in window.location.href
-        'assignmentAcceptKey': '' // TODO extract from 'assignment-accept-key' query parameter in window.location.href
+        'assignmentName': assignmentName
+    }
+    if (assignmentAcceptKey !== null) {
+        workflowInputs['assignmentAcceptKey'] = assignmentAcceptKey;
     }
     const zip = await dispatchWorkflow('accept-assignment.yml', workflowInputs);
 

@@ -39,6 +39,29 @@ jobs:
           path: 'repo'
       - name: Accept assignment
         run: |
+          # TODO Make all curl operations retrieve http status, sending outputs
+          # to file. Then error-handle on http status.
+
+          mkdir -p result
+          rm -rf result/*
+          
+          function secureresult() {
+              # Zip results for encryption
+              zip -qr result.zip result/*
+              rm -f result/*
+
+              # Encrypt result.zip. Generates result.zip.enc, aes-key.enc, and
+              # iv.bin
+              result_encryption_key_base64=$(echo -n "$RESULT_ENCRYPTION_KEY" | tr '_-' '/+')
+              node repo/workflow-util/encrypt.js -f result.zip -k "$result_encryption_key_base64"
+              
+              # Delete plaintext result.zip, and move output files to result/
+              rm -f result.zip
+              mv result.zip.enc result/
+              mv aes-key.enc result/
+              mv iv.bin result/
+          }
+          
           if [[ "$ASSIGNMENT_REPO" == "" ]]
           then
               ASSIGNMENT_REPO="github.com/${{ github.repository }}.git"
@@ -48,6 +71,9 @@ jobs:
           then
               STUDENT_PLATFORM_GIT_HOSTNAME="github.com"
           fi
+          
+          # TODO more defaults for env vars, and error-handle for missing
+          # required vars / secrets
 
           # Mask user access token and assignment accept key in logs
           echo "::add-mask::$USER_ACCESS_TOKEN"
@@ -56,133 +82,153 @@ jobs:
           git config --global user.name "Classroom Robot"
           git config --global user.email "<>"
           
-          # Clone assignment repo
-          git clone "https://${ASSIGNMENT_READ_USERNAME}:${ASSIGNMENT_READ_TOKEN}@${ASSIGNMENT_REPO}" assignments-repo
-
-          # TODO Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
-
-          # Get user's GitHub username
-          user_results=$(curl -L \
+          # Get user's GitHub username and construct student assignment repo
+          # name
+          user_results=$(curl -s -L \
               -H "Authorization: Bearer ${USER_ACCESS_TOKEN}" \
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
               https://api.github.com/user)
           username=$(echo -n "$user_results" | jq -r '.login')
-
           student_assignment_repo="${ASSIGNMENT_NAME}-${username}"
-
           # Replace forbidden characters with hyphens
           student_assignment_repo=$(echo -n "$student_assignment_repo" | sed 's/[^a-zA-Z0-9_\.-]/-/g')
 
-          # TODO Check if assignment repo already exists. In such a case, skip to trying to grant access again (frontend
-          # shouldn't dispatch this workflow if the student already has access to the repo).
-
-          # Create remote student assignment repo
-          create_remote_repo_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
-              -X POST \
+          # Check if student assignment repo already exists.
+          get_remote_repo_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer $STUDENT_ASSIGNMENT_WRITE_TOKEN" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
-              "https://api.github.com/orgs/${STUDENT_ASSIGNMENT_ORGANIZATION}/repos" \
-              -d '{"name":"'"$student_assignment_repo"'","description":"'"${username}'s"' repository for assignment '"$ASSIGNMENT_NAME"'","private":true}')
+              "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}"
 
-          if [[ "$create_remote_repo_status" == "403" ]]
+          if [[ "$get_remote_repo_status" == "404" ]]
           then
-              echo "Error: Authentication failed when generating student assignment repository" >&2
-              exit 1
-          elif [[ "$create_remote_repo_status" == "422" ]]
-          then
-              echo "Error: Got HTTP status 422 when generating assignment repository." >&2
-              exit 1
-          elif [[ "$create_remote_repo_status" != "201" ]]
-          then
-              echo "Error: Got HTTP status $create_remote_repo_status when generating student assignment repository" >&2
-              exit 1
-          fi
+              # Repo doesn't exist. Create it.
+              # Clone assignment template repo
+              git clone "https://${ASSIGNMENT_READ_USERNAME}:${ASSIGNMENT_READ_TOKEN}@${ASSIGNMENT_REPO}" assignments-repo
 
-          # Create local student assignment repo and push contents to remote
-          # repo
-          mkdir -p "$student_assignment_repo"
-          cp -R assignments-repo/assignments/"$ASSIGNMENT_NAME"/* "$student_assignment_repo"
-          (
-              cd "$student_assignment_repo"
-              git init -b main
-              git add -A
-              git commit -m "Classroom Robot: Instantiate assignment"
-              remote_repo_git_url="https://${STUDENT_ASSIGNMENT_WRITE_USERNAME}:${STUDENT_ASSIGNMENT_WRITE_TOKEN}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}.git"
-              git push "$remote_repo_git_url" main
-          )
+              # Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
+              if [[ -f "assignments-repo/assignments/assignments.conf" ]]
+              then
+                  assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq -r '.assignments[] | select(.name == "assignment-1") | [.][0].key')
+                  if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
+                  then
+                      echo "Error: Incorrect assignment accept key" >&2
+                      echo -n '{"status": "invalid-key"}' > result/status.json
+                      secureresult
+                      exit 0
+                  fi
+              fi
 
-          # Send invite to add student as outside collaborator for repo, or add
-          # as collaborator directly under certain conditions (e.g., if they're
-          # a member of the organization, or a member of a team that's already
-          # a collaborator)
-
-          add_collaborator_status=$(curl -L \
-              -s -o curl.json -w "%{http_code}" \
-              -X PUT \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer $STUDENT_ASSIGNMENT_WRITE_TOKEN" \
-              -H "X-GitHub-Api-Version: 2026-03-10" \
-              "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}/collaborators/${username}" \
-              -d '{"permission":"push"}')
-
-          if [[ "$add_collaborator_status" == "403" ]]
-          then
-              echo "Error: Authentication failed when adding student as collaborator to their assignment repository" >&2
-              exit 1
-          elif [[ "$add_collaborator_status" == "201" ]]
-          then
-              # Invite sent. Auto-accept invite on student's behalf using the
-              # oauth token (prevents invite from expiring due to student
-              # negligence, which would require instructor intervention).
-              filtered_curl_results=$(cat curl.json | jq -r '.repository.html_url,.url')
-              student_repository_url=$(echo "$filtered_curl_results" | sed -n '1p')
-              invite_url=$(echo "$filtered_curl_results" | sed -n '2p')
-              accept_invite_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
-                  -X PATCH \
+              # Create remote student assignment repo
+              create_remote_repo_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
+                  -X POST \
                   -H "Accept: application/vnd.github+json" \
-                  -H "Authorization: Bearer ${USER_ACCESS_TOKEN}" \
+                  -H "Authorization: Bearer $STUDENT_ASSIGNMENT_WRITE_TOKEN" \
                   -H "X-GitHub-Api-Version: 2026-03-10" \
-                  "$invite_url")
-              if [[ "$accept_invite_status" == "403" ]]
+                  "https://api.github.com/orgs/${STUDENT_ASSIGNMENT_ORGANIZATION}/repos" \
+                  -d '{"name":"'"$student_assignment_repo"'","description":"'"${username}'s"' repository for assignment '"$ASSIGNMENT_NAME"'","private":true}')
+
+              if [[ "$create_remote_repo_status" == "403" ]]
               then
-                  echo "Error: Authentication failed when accepting outside collaborator invite on student's behalf" >&2
+                  echo "Error: Authentication failed when generating student assignment repository" >&2
                   exit 1
-              elif [[ "$accept_invite_status" != "204" ]]
+              elif [[ "$create_remote_repo_status" == "422" ]]
               then
-                  echo "Error: Got HTTP status $accept_invite_status when accepting outside collaborator invite on student's behalf" >&2
+                  echo "Error: Got HTTP status 422 when generating assignment repository." >&2
+                  exit 1
+              elif [[ "$create_remote_repo_status" != "201" ]]
+              then
+                  echo "Error: Got HTTP status $create_remote_repo_status when generating student assignment repository" >&2
                   exit 1
               fi
-          elif [[ "$add_collaborator_status" == "204" ]]
+
+              # Create local student assignment repo and push contents to remote
+              # repo
+              mkdir -p "$student_assignment_repo"
+              cp -R assignments-repo/assignments/"$ASSIGNMENT_NAME"/* "$student_assignment_repo"
+              (
+                  cd "$student_assignment_repo"
+                  git init -b main
+                  git add -A
+                  git commit -m "Classroom Robot: Instantiate assignment"
+                  remote_repo_git_url="https://${STUDENT_ASSIGNMENT_WRITE_USERNAME}:${STUDENT_ASSIGNMENT_WRITE_TOKEN}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}.git"
+                  git push "$remote_repo_git_url" main
+              )
+          elif [[ "$get_remote_repo_status" != "200" ]]
           then
-              # Student added directly as collaborator (no invite was needed)
-              student_repository_url="https://${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}"
-          else
-              echo "Error: Got HTTP status $add_collaborator_status when adding student as collaborator to their assignment repository" >&2
+              echo "Error: Got HTTP status $get_remote_repo_status when retrieving student assignment repository" >&2
               exit 1
           fi
-          rm -f curl.json
+          
+          # Check if student already has access to repository.
+          get_collaborator_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer <YOUR-TOKEN>" \
+              -H "X-GitHub-Api-Version: 2026-03-10" \
+              "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}/collaborators/$username")
+          if [[ "$get_collaborator_status" == "404" ]]
+          then
+              # User is not a collaborator. Add them.
+              # Send invite to add student as outside collaborator for repo, or add
+              # as collaborator directly under certain conditions (e.g., if they're
+              # a member of the organization, or a member of a team that's already
+              # a collaborator)
 
-          # Store results for artifact
-          mkdir -p result
+              add_collaborator_status=$(curl -L \
+                  -s -o curl.json -w "%{http_code}" \
+                  -X PUT \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Authorization: Bearer $STUDENT_ASSIGNMENT_WRITE_TOKEN" \
+                  -H "X-GitHub-Api-Version: 2026-03-10" \
+                  "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}/collaborators/${username}" \
+                  -d '{"permission":"push"}')
+
+              if [[ "$add_collaborator_status" == "403" ]]
+              then
+                  echo "Error: Authentication failed when adding student as collaborator to their assignment repository" >&2
+                  exit 1
+              elif [[ "$add_collaborator_status" == "201" ]]
+              then
+                  # Invite sent. Auto-accept invite on student's behalf using the
+                  # oauth token (prevents invite from expiring due to student
+                  # negligence, which would require instructor intervention).
+                  filtered_curl_results=$(cat curl.json | jq -r '.repository.html_url,.url')
+                  student_repository_url=$(echo "$filtered_curl_results" | sed -n '1p')
+                  invite_url=$(echo "$filtered_curl_results" | sed -n '2p')
+                  accept_invite_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
+                      -X PATCH \
+                      -H "Accept: application/vnd.github+json" \
+                      -H "Authorization: Bearer ${USER_ACCESS_TOKEN}" \
+                      -H "X-GitHub-Api-Version: 2026-03-10" \
+                      "$invite_url")
+                  if [[ "$accept_invite_status" == "403" ]]
+                  then
+                      echo "Error: Authentication failed when accepting outside collaborator invite on student's behalf" >&2
+                      exit 1
+                  elif [[ "$accept_invite_status" != "204" ]]
+                  then
+                      echo "Error: Got HTTP status $accept_invite_status when accepting outside collaborator invite on student's behalf" >&2
+                      exit 1
+                  fi
+              elif [[ "$add_collaborator_status" != "204" ]]
+              then
+                  # 204 (no content) means student was added directly
+                  # as collaborator (no invite was needed), or they were
+                  # already a collaborator. Anything other than
+                  # HTTP 201 / 204 is an error.
+                  echo "Error: Got HTTP status $add_collaborator_status when adding student as collaborator to their assignment repository" >&2
+                  exit 1
+              fi
+              rm -f curl.json
+          fi
+
+          student_repository_url="https://${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}"
           echo -n '{"repositoryURL": "'"$student_repository_url"'"}' > result/data.json
           echo -n '{"status": "success"}' > result/status.json
-          
-          # Zip results for encryption
-          zip -qr result.zip result/*
-          rm -f result/*
 
-          # Encrypt result.zip. Generates result.zip.enc, aes-key.enc, and
-          # iv.bin
-          result_encryption_key_base64=$(echo -n "$RESULT_ENCRYPTION_KEY" | tr '_-' '/+')
-          node repo/workflow-util/encrypt.js -f result.zip -k "$result_encryption_key_base64"
-          
-          # Delete plaintext result.zip, and move output files to result/
-          rm -f result.zip
-          mv result.zip.enc result/
-          mv aes-key.enc result/
-          mv iv.bin result/
+          secureresult
+          exit 0
 
       - name: Upload secure results
         uses: actions/upload-artifact@v4
