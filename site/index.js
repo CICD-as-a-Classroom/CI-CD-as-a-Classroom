@@ -372,5 +372,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Perhaps we should present a link to the repo page and let the user
     // navigate to it themselves
-    window.location.replace(responseData.repositoryURL);
+    console.log(responseData);
+    console.log(responseData.repositoryURL);
+    //window.location.replace(responseData.repositoryURL);
 });
