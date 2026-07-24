@@ -229,10 +229,11 @@ jobs:
                   # Invite sent. Auto-accept invite on student's behalf using the
                   # oauth token (prevents invite from expiring due to student
                   # negligence, which would require instructor intervention).
+                  echo "curl results:"
+                  cat curl.json
                   filtered_curl_results=$(cat curl.json | jq -r '.repository.html_url,.url')
                   student_repository_url=$(echo "$filtered_curl_results" | sed -n '1p')
                   invite_url=$(echo "$filtered_curl_results" | sed -n '2p')
-                  echo "Invite url: $invite_url"
                   accept_invite_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
                       -X PATCH \
                       -H "Accept: application/vnd.github+json" \
