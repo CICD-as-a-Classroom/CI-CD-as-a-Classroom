@@ -212,7 +212,7 @@ jobs:
               echo here 1
 
               add_collaborator_status=$(curl -L \
-                  -s -o curl.json -w "%{http_code}" \
+                  -s -o /dev/null -w "%{http_code}" \
                   -X PUT \
                   -H "Accept: application/vnd.github+json" \
                   -H "Authorization: Bearer $STUDENT_ASSIGNMENT_WRITE_TOKEN" \
@@ -224,42 +224,15 @@ jobs:
               then
                   echo "Error: Authentication failed when adding student as collaborator to their assignment repository" >&2
                   exit 1
-              elif [[ "$add_collaborator_status" == "201" ]]
+              elif [[ "$add_collaborator_status" != "204" && "$add_collaborator_status" != 201 ]]
               then
-                  # Invite sent. Auto-accept invite on student's behalf using the
-                  # oauth token (prevents invite from expiring due to student
-                  # negligence, which would require instructor intervention).
-                  echo "curl results:"
-                  cat curl.json
-                  filtered_curl_results=$(cat curl.json | jq -r '.repository.html_url,.url')
-                  student_repository_url=$(echo "$filtered_curl_results" | sed -n '1p')
-                  invite_url=$(echo "$filtered_curl_results" | sed -n '2p')
-                  accept_invite_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
-                      -X PATCH \
-                      -H "Accept: application/vnd.github+json" \
-                      -H "Authorization: Bearer ${USER_ACCESS_TOKEN}" \
-                      -H "X-GitHub-Api-Version: 2026-03-10" \
-                      "$invite_url")
-                  if [[ "$accept_invite_status" == "403" ]]
-                  then
-                      echo "Error: Authentication failed when accepting outside collaborator invite on student's behalf" >&2
-                      exit 1
-                  elif [[ "$accept_invite_status" != "204" ]]
-                  then
-                      # HTTP 204 is success. Anything else is an error. 
-                      echo "Error: Got HTTP status $accept_invite_status when accepting outside collaborator invite on student's behalf" >&2
-                      exit 1
-                  fi
-              elif [[ "$add_collaborator_status" != "204" ]]
-              then
-                  # 204 (no content) means student was added directly
+                  # HTTP 204 (no content) means student was added directly
                   # as collaborator (no invite was needed), or they were
-                  # already a collaborator. Anything other than
-                  # HTTP 201 / 204 is an error.
+                  # already a collaborator. HTTP 201 means an invite was
+                  # sent. Anything else is an error.
                   echo "Error: Got HTTP status $add_collaborator_status when adding student as collaborator to their assignment repository" >&2
                   exit 1
               fi
-              rm -f curl.json
           elif [[ "$get_collaborator_status" != "204" ]]
           then
               # HTTP 204 means already a collaborator, 404 means not a
