@@ -70,10 +70,9 @@ jobs:
           # Replace forbidden characters with hyphens
           student_assignment_repo=$(echo -n "$student_assignment_repo" | sed 's/[^a-zA-Z0-9_\.-]/-/g')
 
-          echo "https://api.github.com/orgs/${STUDENT_ASSIGNMENT_ORGANIZATION}/repos" \
-          echo '{"name":"'"$student_assignment_repo"'","description":"'"${username}'s"' repository for assignment '"$ASSIGNMENT_NAME"'","private":true}'
-          echo '{"name":"'"$student_assignment_repo"'"}'
-          
+          # TODO Check if assignment repo already exists. In such a case, skip to trying to grant access again (frontend
+          # shouldn't dispatch this workflow if the student already has access to the repo).
+
           # Create remote student assignment repo
           create_remote_repo_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
               -X POST \
@@ -81,12 +80,15 @@ jobs:
               -H "Authorization: Bearer $STUDENT_ASSIGNMENT_WRITE_TOKEN" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
               "https://api.github.com/orgs/${STUDENT_ASSIGNMENT_ORGANIZATION}/repos" \
-              -d '{"name":"'"$student_assignment_repo"'"}')
-              #-d '{"name":"'"$student_assignment_repo"'","description":"'"${username}'s"' repository for assignment '"$ASSIGNMENT_NAME"'","private":true}')
+              -d '{"name":"'"$student_assignment_repo"'","description":"'"${username}'s"' repository for assignment '"$ASSIGNMENT_NAME"'","private":true}')
 
           if [[ "$create_remote_repo_status" == "403" ]]
           then
               echo "Error: Authentication failed when generating student assignment repository" >&2
+              exit 1
+          elif [[ "$create_remote_repo_status" == "422" ]]
+          then
+              echo "Error: Got HTTP status 422 when generating assignment repository." >&2
               exit 1
           elif [[ "$create_remote_repo_status" != "201" ]]
           then
