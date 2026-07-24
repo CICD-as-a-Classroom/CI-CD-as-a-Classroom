@@ -107,13 +107,42 @@ jobs:
               # Clone assignment template repo
               git clone "https://${ASSIGNMENT_READ_USERNAME}:${ASSIGNMENT_READ_TOKEN}@${ASSIGNMENT_REPO}" assignments-repo
 
+              # Verify that the assignment to be accepted exists (either as a
+              # directory with contents or in config file)
+              assignment_exists=1
+              assignment_template_exists=1
+              if [[ ! -d "assignments-repo/assignments/${ASSIGNMENT_NAME}" ]]
+              then
+                  assignment_template_exists=0
+                  if [[ ! -f "assignments-repo/assignments/assignments.conf" ]]
+                  then
+                      assignment_exists=0
+                  else
+                      n_matching_assignments=$(cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -s 'length')
+                      if [[ "$n_matching_assignments" == 0 ]]
+                      then
+                          assignment_exists=0
+                      fi
+                  fi
+              fi
+
+              if [[ "$assignment_exists" == 0 ]]
+              then
+                  # Assignment doesn't exist. Return error to client.
+                  echo "Error: Assignment \"$ASSIGNMENT_NAME\" doesn't exist" >&2
+                  echo -n '{"status": "unknown-assignment"}' > result/status.json
+                  secureresult
+                  exit 0
+              fi
+
               # Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
               if [[ -f "assignments-repo/assignments/assignments.conf" ]]
               then
-                  assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq -r '.assignments[] | select(.name == "assignment-1") | [.][0].key')
+                  assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq -r '.[] | select(.name == "'"$ASSIGNMENT_NAME"'") | [.][0].key')
                   if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
                   then
-                      echo "Error: Incorrect assignment accept key" >&2
+                      # Invalid assignment accept key. Return error to client.
+                      echo "Error: Invalid assignment accept key \"$ASSIGNMENT_ACCEPT_KEY\" for assignment \"$ASSIGNMENT_NAME\"" >&2
                       echo -n '{"status": "invalid-key"}' > result/status.json
                       secureresult
                       exit 0
@@ -143,20 +172,26 @@ jobs:
                   exit 1
               fi
 
-              # Create local student assignment repo and push contents to remote
+              # If assignment template directory exists, then create local
+              # student assignment repo and push contents to remote
               # repo
-              mkdir -p "$student_assignment_repo"
-              cp -R assignments-repo/assignments/"$ASSIGNMENT_NAME"/* "$student_assignment_repo"
-              (
-                  cd "$student_assignment_repo"
-                  git init -b main
-                  git add -A
-                  git commit -m "Classroom Robot: Instantiate assignment"
-                  remote_repo_git_url="https://${STUDENT_ASSIGNMENT_WRITE_USERNAME}:${STUDENT_ASSIGNMENT_WRITE_TOKEN}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}.git"
-                  git push "$remote_repo_git_url" main
-              )
+              if [[ "$assignment_template_exists" == 1 ]]
+              then
+                  mkdir -p "$student_assignment_repo"
+                  cp -R assignments-repo/assignments/"$ASSIGNMENT_NAME"/* "$student_assignment_repo"
+                  (
+                      cd "$student_assignment_repo"
+                      git init -b main
+                      git add -A
+                      git commit -m "Classroom Robot: Instantiate assignment"
+                      remote_repo_git_url="https://${STUDENT_ASSIGNMENT_WRITE_USERNAME}:${STUDENT_ASSIGNMENT_WRITE_TOKEN}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}.git"
+                      git push "$remote_repo_git_url" main
+                  )
+              fi
           elif [[ "$get_remote_repo_status" != "200" ]]
           then
+              # HTTP 200 means repo exists. 404 means it doesn't. Anything else
+              # is an error.
               echo "Error: Got HTTP status $get_remote_repo_status when retrieving student assignment repository" >&2
               exit 1
           fi
