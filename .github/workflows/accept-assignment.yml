@@ -107,7 +107,8 @@ jobs:
           (
               cd "$student_assignment_repo"
               git init -b main
-              git commit -am "Classroom Robot: Instantiate assignment"
+              git add -A
+              git commit -m "Classroom Robot: Instantiate assignment"
               remote_repo_git_url="https://${STUDENT_ASSIGNMENT_WRITE_USERNAME}:${STUDENT_ASSIGNMENT_WRITE_TOKEN}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}.git"
               git push "$remote_repo_git_url" main
           )
