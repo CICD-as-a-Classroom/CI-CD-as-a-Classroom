@@ -232,6 +232,7 @@ jobs:
                   filtered_curl_results=$(cat curl.json | jq -r '.repository.html_url,.url')
                   student_repository_url=$(echo "$filtered_curl_results" | sed -n '1p')
                   invite_url=$(echo "$filtered_curl_results" | sed -n '2p')
+                  echo "Invite url: $invite_url"
                   accept_invite_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
                       -X PATCH \
                       -H "Accept: application/vnd.github+json" \
@@ -244,6 +245,7 @@ jobs:
                       exit 1
                   elif [[ "$accept_invite_status" != "204" ]]
                   then
+                      # HTTP 204 is success. Anything else is an error. 
                       echo "Error: Got HTTP status $accept_invite_status when accepting outside collaborator invite on student's behalf" >&2
                       exit 1
                   fi
