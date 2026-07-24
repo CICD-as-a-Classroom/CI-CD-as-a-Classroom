@@ -99,7 +99,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer $STUDENT_ASSIGNMENT_WRITE_TOKEN" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
-              "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}"
+              "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}")
 
           if [[ "$get_remote_repo_status" == "404" ]]
           then
