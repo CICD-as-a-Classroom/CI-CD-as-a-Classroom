@@ -115,7 +115,6 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
     dispatch_token += 't_'
     dispatch_token += '11AINDF5Y0mtIaO1OpgPAs_6QKAga2FF'
     dispatch_token += 'XUsXv8ARf2H7W6AP61R9C4LQfakeGRU8dKZI2YYG6ZHDAd8DTB'
-    console.log(data);
     const response = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowID}/dispatches`,
         {
@@ -130,9 +129,6 @@ async function dispatchWorkflow(workflowID, workflowInputs) {
     );
     if (!response.ok) {
         console.log("Error: Failed to dispatch workflow");
-        console.log(response.status);
-        const responseData = await response.json();
-        console.log(responseData);
         return;
         // TODO implement
     }
@@ -372,7 +368,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Perhaps we should present a link to the repo page and let the user
     // navigate to it themselves
-    console.log(responseData);
-    console.log(responseData.repositoryURL);
-    //window.location.replace(responseData.repositoryURL);
+    window.location.replace(responseData.repositoryURL);
 });
