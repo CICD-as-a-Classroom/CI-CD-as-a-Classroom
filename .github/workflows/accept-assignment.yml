@@ -157,6 +157,7 @@ jobs:
           elif [[ "$add_collaborator_status" == "204" ]]
           then
               # Student added directly as collaborator (no invite was needed)
+              cat curl.json
               student_repository_url=$(cat curl.json | jq -r '.repository.html_url')
           else
               echo "Error: Got HTTP status $add_collaborator_status when adding student as collaborator to their assignment repository" >&2
