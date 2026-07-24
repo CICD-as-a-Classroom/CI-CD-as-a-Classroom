@@ -89,7 +89,6 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
               https://api.github.com/user)
-          echo here 3
           username=$(echo -n "$user_results" | jq -r '.login')
           student_assignment_repo="${ASSIGNMENT_NAME}-${username}"
           # Replace forbidden characters with hyphens
@@ -119,7 +118,6 @@ jobs:
                   then
                       assignment_exists=0
                   else
-                      echo here 1
                       n_matching_assignments=$(cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -s 'length')
                       if [[ "$n_matching_assignments" == 0 ]]
                       then
@@ -140,7 +138,8 @@ jobs:
               # Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
               if [[ -f "assignments-repo/assignments/assignments.conf" ]]
               then
-                  echo here 2
+                  echo here
+                  cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")'
                   assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rs 'if length > 0 then .[0].key else "" end')
                   if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
                   then
@@ -231,7 +230,6 @@ jobs:
                   # Invite sent. Auto-accept invite on student's behalf using the
                   # oauth token (prevents invite from expiring due to student
                   # negligence, which would require instructor intervention).
-                  echo here 4
                   filtered_curl_results=$(cat curl.json | jq -r '.repository.html_url,.url')
                   student_repository_url=$(echo "$filtered_curl_results" | sed -n '1p')
                   invite_url=$(echo "$filtered_curl_results" | sed -n '2p')
