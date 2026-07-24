@@ -199,7 +199,7 @@ jobs:
           # Check if student already has access to repository.
           get_collaborator_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
               -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer <YOUR-TOKEN>" \
+              -H "Authorization: Bearer ${STUDENT_ASSIGNMENT_WRITE_TOKEN}" \
               -H "X-GitHub-Api-Version: 2026-03-10" \
               "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}/collaborators/$username")
           if [[ "$get_collaborator_status" == "404" ]]
@@ -209,6 +209,7 @@ jobs:
               # as collaborator directly under certain conditions (e.g., if they're
               # a member of the organization, or a member of a team that's already
               # a collaborator)
+              echo here 1
 
               add_collaborator_status=$(curl -L \
                   -s -o curl.json -w "%{http_code}" \
@@ -256,6 +257,12 @@ jobs:
                   exit 1
               fi
               rm -f curl.json
+          elif [[ "$get_collaborator_status" != "204" ]]
+          then
+              # HTTP 204 means already a collaborator, 404 means not a
+              # collaborator. Anything else is an error.
+              echo "Error: Got HTTP status $get_collaborator_status when checking if student is a collaborator on their assignment repository" >&2
+              exit 1
           fi
 
           student_repository_url="https://${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${student_assignment_repo}"
