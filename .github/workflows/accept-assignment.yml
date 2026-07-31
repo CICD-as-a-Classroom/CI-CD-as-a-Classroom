@@ -103,6 +103,7 @@ jobs:
           if [[ "$ASSIGNMENT_TEMPLATE_REPO_PLATFORM" == "github" ]]
           then
               export ASSIGNMENT_TEMPLATE_READ_USERNAME="x-access-token"
+              export STUDENT_ASSIGNMENT_WRITE_USERNAME="x-access-token"
           fi
 
           # TODO more environment variable error handling + default values

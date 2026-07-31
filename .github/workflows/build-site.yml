@@ -14,7 +14,7 @@ jobs:
     env:
       PUBLIC_PATH: ${{ vars.PUBLIC_PATH }}
       POLL_DELAY: ${{ vars.POLL_DELAY }}
-      AUTH_APP_ID: ${{ vars.AUTH_APP_ID }}
+      AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
       BACKEND_REPO_OWNER: ${{ vars.BACKEND_REPO_OWNER }}
       BACKEND_REPO: ${{ vars.BACKEND_REPO }}
       WORKFLOW_DISPATCH_APP_ID: ${{ vars.WORKFLOW_DISPATCH_APP_ID }}
@@ -22,7 +22,7 @@ jobs:
       WORKFLOW_DISPATCH_APP_PRIVATE_KEY: ${{ secrets.WORKFLOW_DISPATCH_APP_PRIVATE_KEY }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Build
         working-directory: ./site
         run: |
@@ -46,7 +46,7 @@ jobs:
           mkdir -p src/config
 
           echo "pollDelay: ${POLL_DELAY}" >> src/config/conf.yaml
-          echo "authClientId: '${AUTH_APP_ID}'" >> src/config/conf.yaml
+          echo "authClientId: '${AUTH_CLIENT_ID}'" >> src/config/conf.yaml
           echo "backendRepoOwner: '${BACKEND_REPO_OWNER}'" >> src/config/conf.yaml
           echo "backendRepo: '${BACKEND_REPO}'" >> src/config/conf.yaml
           echo "dispatchRef: 'main'" >> src/config/conf.yaml

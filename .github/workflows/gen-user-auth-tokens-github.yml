@@ -25,8 +25,8 @@ jobs:
       name: ${{ github.ref_name == 'main' && 'production' || github.ref_name }}
       deployment: false
     env:
-      AUTH_APP_ID: ${{ vars.AUTH_APP_ID }}
-      AUTH_APP_SECRET: ${{ secrets.AUTH_APP_SECRET }}
+      AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
+      AUTH_CLIENT_SECRET: ${{ secrets.AUTH_CLIENT_SECRET }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -69,8 +69,8 @@ jobs:
 
           # Retrieve auth tokens via cURL request
           auth_status=$(curl -X POST -s -o curl.json -w "%{http_code}" -H "Accept: application/vnd.github+json" "https://github.com/login/oauth/access_token" \
-            --url-query "client_id=$AUTH_APP_ID" \
-            --url-query "client_secret=$AUTH_APP_SECRET" \
+            --url-query "client_id=$AUTH_CLIENT_ID" \
+            --url-query "client_secret=$AUTH_CLIENT_SECRET" \
             --url-query "code=$AUTH_CODE" \
             --url-query "code_verifier=$PKCE_CODE_VERIFIER")
           
