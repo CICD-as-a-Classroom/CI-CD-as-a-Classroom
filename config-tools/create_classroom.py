@@ -1,3 +1,4 @@
+import jwt
 import shutil
 import tempfile
 import subprocess
@@ -183,17 +184,20 @@ class AppRegistrationResponse:
     client_id: str
     client_secret: str
     private_key: str
+    installation_url: str
 
     def __init__(
             self,
             app_id: int,
             client_id: str,
             client_secret: str,
-            private_key: str) -> None:
+            private_key: str,
+            installation_url: str) -> None:
         self.app_id = app_id
         self.client_id = client_id
         self.client_secret = client_secret
         self.private_key = private_key
+        self.installation_url = installation_url
 
 
 class AppInstallationResponse:
@@ -212,18 +216,63 @@ class RepositoryCreationData:
         self.html_url = html_url
 
 
+type Json = typing.Any
+type Repository = Json
+
+
 class AppDetails:
     installation_instructions: str
+    installation_configuration_error_message: str
     next_registration_endpoint: str | None
+    installation_verifier: typing.Callable[[str, list[Repository] | None], bool]
+    
     def __init__(
             self,
             installation_instructions: str,
+            installation_configuration_error_message: str,
+            installation_verifier: typing.Callable[[str, list[Repository] | None], bool],
             next_registration_endpoint: str | None = None) -> None:
         self.installation_instructions = installation_instructions
+        self.installation_configuration_error_message =\
+            installation_configuration_error_message
         self.next_registration_endpoint = next_registration_endpoint
+        self.installation_verifier = installation_verifier
 
 
 class HandlerContext:
+    @staticmethod
+    def verify_workflow_dispatch_installation(
+            repository_selection: str,
+            repositories: list[Repository] | None) -> bool:
+        if repository_selection != 'selected':
+            rprint(f'bad selection: {repository_selection}')
+            return False
+
+        if repositories is None or len(repositories) != 1:
+            rprint(f'bad repositories length: {repositories if repositories is None else len(repositories)}')
+            return False
+        
+        if repositories[0]['name'] != 'backend-workflows':
+            rprint(f'bad repo name: {repositories[0]['name']}')
+            return False
+
+        return True
+        
+
+    @staticmethod
+    def verify_assignment_template_reading_installation(
+            repository_selection: str,
+            repositories: list[Repository] | None) -> bool:
+        return repository_selection == 'all'
+
+
+    @staticmethod
+    def verify_student_assignment_writing_installation(
+            repository_selection: str,
+            repositories: list[Repository] | None) -> bool:
+        return repository_selection == 'all'
+
+
     # TODO consolidate the various app-specific constants / dicts into
     # APP_DETAILS
     REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT = \
@@ -276,25 +325,41 @@ class HandlerContext:
     }
     APP_DETAILS = {
         REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT: AppDetails(
-            installation_instructions=(f'Install the workflow dispatch app '
+            installation_instructions=('Install the workflow dispatch app '
                 'in your GitHub Organization '
                 'on the "backend-workflows" repository. CRITICAL: '
                 'Install this app ONLY on the "backend-workflows" '
                 'repository. Do NOT install it on all repositories.'),
+            installation_configuration_error_message=('For security reasons, '
+                'the workflow dispatch '
+                'app must be installed on, and ONLY on, the "backend-workflows" '
+                'repository.'),
             next_registration_endpoint=\
-                REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT,
+            installation_verifier=\
+                verify_workflow_dispatch_installation
         ),
         REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: AppDetails(
             installation_instructions=(f'Install the student assignment '
                 'writing app in your GitHub '
                 'Organization on ALL repositories.'),
+            installation_configuration_error_message=('The student assignment '
+                'writing app must be installed on ALL (not selected) '
+                'repositories.'),
             next_registration_endpoint=\
-                REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
+            installation_verifier=\
+                verify_assignment_template_reading_installation
         ),
         REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: AppDetails(
             installation_instructions=(f'Install the assignment template '
                 'reading app in your GitHub '
-                'Organization on ALL repositories.')
+                'Organization on ALL repositories.'),
+            installation_configuration_error_message=('The assignment template '
+                'reading app must be installed on ALL (not selected) '
+                'repositories.'),
+            installation_verifier=\
+                verify_student_assignment_writing_installation
         )
     }
     content_events: dict[str, threading.Event]
@@ -304,6 +369,7 @@ class HandlerContext:
     all_repository_creation_data: dict[str, RepositoryCreationData]
     app_registration_responses: dict[str, AppRegistrationResponse]
     app_installation_responses: dict[str, AppInstallationResponse]
+    state_string: str | None
     
     def __init__(
             self,
@@ -321,6 +387,7 @@ class HandlerContext:
         self.all_repository_creation_data = all_repository_creation_data
         self.app_registration_responses = {}
         self.app_installation_responses = {}
+        self.state_string = None
 
 
 URL_CHARS="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_"
@@ -433,17 +500,17 @@ window.addEventListener('DOMContentLoaded', () => {{
             client_id = response_json['client_id']
             client_secret = response_json['client_secret']
             private_key = response_json['pem']
+            html_url = response_json['html_url']
+            installation_url=f'{html_url}/installations/new'
             context.app_registration_responses[
                 registration_endpoint
             ] = AppRegistrationResponse(
                 app_id,
                 client_id,
                 client_secret,
-                private_key
+                private_key,
+                installation_url
             )
-
-            html_url = response_json['html_url']
-            installation_url=f'{html_url}/installations/new'
 
             html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Next action item: {context.APP_DETAILS[registration_endpoint].installation_instructions}</div><form id="manifest-form" action="{installation_url}" method="get">
 <input type="submit" value="Click here to begin action item">
@@ -473,6 +540,73 @@ window.addEventListener('DOMContentLoaded', () => {{
                 context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
             )
 
+        
+        def get_installation_repository_access(
+                self,
+                registration_endpoint: str)\
+                -> tuple[str, list[Repository] | None]:
+            # Get client id, private key, installation id
+            client_id = context.app_registration_responses[
+                registration_endpoint
+            ].client_id
+            private_key = context.app_registration_responses[
+                registration_endpoint
+            ].private_key
+            installation_id = context.app_installation_responses[
+                registration_endpoint
+            ].installation_id
+
+            # Generate JWT and sign with private key
+            payload = {
+                'iat': int(time.time()) - 60,
+                'exp': int(time.time()) - 60 + 600,
+                'iss': client_id
+            }
+            encoded_jwt = jwt.encode(payload, private_key, algorithm='RS256')
+
+            # Exchange JWT for installation access token and
+            # repository_selection value
+            headers = {
+                'X-GitHub-Api-Version': '2026-03-10',
+                'Accept': 'application/vnd.github+json',
+                'Authorization': f'Bearer {encoded_jwt}'
+            }
+            response = requests.post(
+                (f'https://api.github.com/app/installations/'
+                    f'{installation_id}/access_tokens'),
+                headers=headers
+            )
+
+            if response.status_code < 200 or response.status_code >= 300:
+                raise ValueError(f'Got HTTP status code {response.status_code} '
+                    f'when generating installation access token')
+
+            response_json = response.json()
+            installation_access_token = response_json['token']
+            repository_selection = response_json['repository_selection']
+
+            repositories = None
+            if repository_selection == 'selected':
+                headers = {
+                    'X-GitHub-Api-Version': '2026-03-10',
+                    'Accept': 'application/vnd.github+json',
+                    'Authorization': f'Bearer {installation_access_token}'
+                }
+                response = requests.get(
+                    f'https://api.github.com/installation/repositories',
+                    headers=headers
+                )
+
+                if response.status_code < 200 or response.status_code >= 300:
+                    raise ValueError(f'Got HTTP status code '
+                        f'{response.status_code} when retrieving installation '
+                        'repository access data')
+
+                response_json = response.json()
+                repositories = response_json['repositories']
+
+            return repository_selection, repositories
+
 
         def setup_app(self, registration_endpoint: str) -> None:
             app_name = context.APP_NAMES[
@@ -492,28 +626,31 @@ window.addEventListener('DOMContentLoaded', () => {{
                     registration_endpoint
             ] = AppInstallationResponse(installation_id)
 
-            # TODO Run context.APP_DETAILS[registration_endpoint].installation_verifier
-            # to make sure it was installed properly (workflow dispatch app
-            # should only be installed on the backend-workflows repo, and it
-            # should only have read permissions on its contents (and write
-            # permissions on actions); student assignment writing app should
-            # be installed on all organization repositories with writing
-            # permissions on contents and administration; assignment template
-            # reading app should be installed on all organization repositories
-            # with reading permissions on contents). Such verifications
-            # will require generating and signing a JWT, exchanging it for
-            # an installation access token, and using it in the
-            # GET /installation/repositories endpoint. This can at least be
-            # used to check for which / how many repositories an installation
-            # has access to. If I want to robustly verify that the user didn't
-            # mess with app permissions, I'll have to use additional endpoints
-            # after that to check memberships using the installation access
-            # token as the auth bearer. But that's probably excessive.
-            # Anyways, this function can generate and sign the JWT, exchange for
-            # the installation access token, and query the endpoint. The
-            # endpoint-specific installation verifier function will just
-            # verify the response of that query, and conduct additional
-            # queries if necessary.
+            
+            # Verify that the user configured the installation properly,
+            # giving it access to the correct repositories
+            repository_selection, repositories =\
+                self.get_installation_repository_access(
+                    registration_endpoint
+                )
+            verified = context.APP_DETAILS[registration_endpoint]\
+                .installation_verifier(
+                    repository_selection, repositories
+                )
+
+            if not verified:
+                # Bad config. Tell user to reconfigure. They'll be redirected
+                # here for another check when they do.
+                html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Error: {context.APP_DETAILS[registration_endpoint].installation_configuration_error_message}</div><form id="manifest-form" action="{context.app_registration_responses[registration_endpoint].installation_url}" method="get">
+    <input type="submit" value="Click here to reconfigure app installation">
+    </form></div></body></html>
+    '''
+
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                self.wfile.write(html.encode('utf-8'))
+                
 
             # Else, installation was configured properly. 
             next_registration_endpoint = \
@@ -598,7 +735,7 @@ window.addEventListener('DOMContentLoaded', () => {{
                 self.end_headers()
                 self.wfile.write(b'')
 
-        def log_message(self, format, *args) -> None:
+        def log_message(self, format: str, *args: typing.Any) -> None:
             pass # Hides default status messages
 
     return Handler
@@ -939,7 +1076,7 @@ def get_repository_public_key(
     response_json = response.json()
     public_key = public.PublicKey(
         response_json['key'].encode("utf-8"),
-        encoding.Base64Encoder()
+        encoding.Base64Encoder() # type: ignore
     )
     return public_key, response_json['key_id']
 
@@ -956,7 +1093,7 @@ def create_repository_secret(
         repository_name: str,
         secret_name: str,
         secret_value: str,
-        public_key: str,
+        public_key: public.PublicKey,
         key_id: str) -> None:
     encrypted_value = encrypt(public_key, secret_value)
     headers = {
@@ -1066,7 +1203,7 @@ def get_github_username(fg_pat: str) -> str:
         raise ValueError(f'Got HTTP status code {response.status_code} when '
             f'retrieving GitHub username')
     response_json = response.json()
-    return response_json['login']
+    return str(response_json['login'])
 
 
 def populate_repository(
@@ -1074,7 +1211,7 @@ def populate_repository(
         github_username: str,
         fg_pat: str,
         repository_name: str,
-        additional_relative_file_paths: list[Path]) -> None:
+        additional_relative_file_paths: list[str]) -> None:
     # Find this repo's root directory (closest ancestor containing .git
     # directory), falling back to this script's grandparent if .git isn't found
     base_src_dir_path = Path(__file__).resolve().parent
