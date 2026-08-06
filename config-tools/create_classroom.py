@@ -715,16 +715,19 @@ def browser_flow(handler_context: HandlerContext) -> None:
 class RepositoryInputData:
     description: str
     private: bool
-    relative_file_paths: list[str]
+    additional_relative_file_paths: list[str]
 
     def __init__(
             self,
             description: str,
             private: bool,
-            relative_file_paths: list[str]) -> None:
+            additional_relative_file_paths: list[str] | None = None) -> None:
+        if additional_relative_file_paths is None:
+            additional_relative_file_paths = []
+
         self.description = description
         self.private = private
-        self.relative_file_paths = relative_file_paths
+        self.additional_relative_file_paths = additional_relative_file_paths
 
 
 ALL_REPOSITORY_INPUT_DATA = {
@@ -732,23 +735,13 @@ ALL_REPOSITORY_INPUT_DATA = {
         description=('This repository strictly '
             'contains backend workflows dispatched by the web frontend '
             '(e.g., to authenticate students, accept assignments, etc).'),
-        private=True,
-        relative_file_paths=[
-            '.github/workflows/accept-assignment.yml',
-            '.github/workflows/gen-user-auth-tokens-github.yml',
-            '.github/workflows/refresh-auth-tokens.yml',
-            'workflow-util'
-        ]
+        private=True
     ),
     'web': RepositoryInputData(
         description=('This repository contains the web frontend '
             'that students interact with to authenticate, '
             'accept assignments, etc'),
-        private=False,
-        relative_file_paths=[
-            '.github/workflows/build-site.yml',
-            'site'
-        ],
+        private=False
     ),
     'assignment-templates': RepositoryInputData(
         description=('This repository contains '
@@ -756,10 +749,7 @@ ALL_REPOSITORY_INPUT_DATA = {
             '(starter code) '
             'that are copied into students\' assignment repositories '
             'upon creation (assignment acceptance).'),
-        private=True,
-        relative_file_paths=[
-            'assignments'
-        ]
+        private=True
     ),
 }
 
@@ -1084,7 +1074,7 @@ def populate_repository(
         github_username: str,
         fg_pat: str,
         repository_name: str,
-        relative_file_paths: list[Path]) -> None:
+        additional_relative_file_paths: list[Path]) -> None:
     # Find this repo's root directory (closest ancestor containing .git
     # directory), falling back to this script's grandparent if .git isn't found
     base_src_dir_path = Path(__file__).resolve().parent
@@ -1132,9 +1122,35 @@ def populate_repository(
                 stderr=subprocess.DEVNULL
             )
 
-            # Copy target contents into local repo, merging with existing
+            # Copy primary repo contents into repo, merging with existing
             # contents
-            for relative_file_path_str in relative_file_paths:
+            primary_repo_content_dir_path = base_src_dir_path / repository_name
+            for complete_src_file_path in \
+                    primary_repo_content_dir_path.iterdir():
+                # Compute dst file path
+                relative_file_path =\
+                    complete_src_file_path.relative_to(
+                        primary_repo_content_dir_path
+                    )
+                complete_dst_file_path =\
+                        base_dst_dir_path / relative_file_path
+
+                # Copy file / directory
+                if complete_src_file_path.is_file():
+                    shutil.copy(
+                        complete_src_file_path,
+                        complete_dst_file_path
+                    )
+                elif complete_src_file_path.is_dir():
+                    shutil.copytree(
+                        complete_src_file_path,
+                        complete_dst_file_path,
+                        dirs_exist_ok=True
+                    )
+            
+            # Copy additional / secondary / shared contents into local repo,
+            # merging with existing contents
+            for relative_file_path_str in additional_relative_file_paths:
                 # Compute complete src and dst file paths
                 relative_file_path = Path(relative_file_path_str)
                 complete_src_file_path = base_src_dir_path / relative_file_path
@@ -1157,16 +1173,6 @@ def populate_repository(
                         dirs_exist_ok=True
                     )
 
-            # Copy repo-specific README.md file
-            readme_src_file_path = \
-                base_src_dir_path / f'README-{repository_name}.md'
-            readme_dst_file_path = \
-                base_dst_dir_path / 'README.md'
-            shutil.copy(
-                readme_src_file_path,
-                readme_dst_file_path
-            )
-            
             # Stage all updated files
             subprocess.run(
                 ['git', 'add', '-A'],
@@ -1201,7 +1207,7 @@ def populate_repositories(
             github_username,
             fg_pat,
             repository_name,
-            input_data.relative_file_paths
+            input_data.additional_relative_file_paths
         )
 
 
@@ -1221,12 +1227,12 @@ def main() -> int:
         fg_pat
     )
 
+    console.clear()
     handler_context = HandlerContext(
         organization_name,
         fg_pat,
         all_repository_creation_data
     )
-    
     browser_flow(handler_context)
 
     console.clear()

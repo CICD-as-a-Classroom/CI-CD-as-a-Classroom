@@ -24,7 +24,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
       - name: Build
-        working-directory: ./site
         run: |
           # Inject build vars into config/build.conf, which gets read by
           # webpack.prod.js
@@ -66,7 +65,7 @@ jobs:
         id: deployment
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site/dist/
+          path: dist/
   deploy:
     environment:
       name: github-pages
