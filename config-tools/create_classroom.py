@@ -22,7 +22,6 @@ from rich.text import Text
 from rich.live import Live
 from rich.layout import Layout
 from rich.panel import Panel
-import pwinput
 import requests
 
 
@@ -33,19 +32,41 @@ def rprint(*args: typing.Any, **kwargs: typing.Any) -> None:
     console.print(*args, **kwargs)
 
 
-def rprint_wrapped(text: str, end: str='\n') -> None:
+def rprint_wrapped(text: str, end: str='\n', **kwargs: typing.Any) -> None:
     lines = text.split('\n')
     for line in lines[:-1]:
-        rprint(textwrap.fill(line, width=80, replace_whitespace=False, drop_whitespace=False))
-    rprint(textwrap.fill(lines[-1], width=80, replace_whitespace=False, drop_whitespace=False), end=end)
+        rprint(
+            textwrap.fill(
+                line,
+                width=80,
+                replace_whitespace=False,
+                drop_whitespace=False
+            ),
+            **kwargs
+        )
+    rprint(
+        textwrap.fill(
+            lines[-1],
+            width=80,
+            replace_whitespace=False,
+            drop_whitespace=False
+        ),
+        end=end,
+        **kwargs
+    )
 
 
-PRESS_ENTER_TO_CONTINUE_MESSAGE = '[Press enter when you\'re ready to continue.]'
+PRESS_ENTER_TO_CONTINUE_MESSAGE = ('[Press enter when you\'re '
+    'ready to continue.]')
 GREET_MESSAGE = (
-    'This tool will guide you through the process of initializing a '
+    'This tool will guide you through the process of setting up a '
     'classroom so that you can distribute programming assignments '
     'to your students. Most of the work will be automated by this tool, '
-    'but some manual intervention will be required.'
+    'but some manual intervention will be required. Please do not exit this '
+    'tool until setup is complete.\n\n'
+    'Note: This tool is NOT designed for modifying an existing classroom '
+    'deployment. Refer to guides/configuration.md for more information on '
+    'classroom deployment configuration.'
 )
 
 
@@ -58,7 +79,8 @@ REQUEST_ORGANIZATION_NAME_MESSAGE_1 = (
     'The first step is to create a GitHub Organization that will manage your '
     'classroom. This step cannot be automated and must be done within the '
     'GitHub web UI. You may use an existing GitHub Organization if you\'d '
-    'like, but you must be an owner of the chosen Organization.\n'
+    'like, but you must be an owner of the chosen Organization. That said, '
+    'it\'s strongly recommended that you use a new organization.\n'
     '\n'
     'Follow the below link to create a new GitHub Organization.'
 )
@@ -72,8 +94,8 @@ REQUEST_ORGANIZATION_NAME_REPROMPT = (
     'For confirmation, please enter the organization name again: '
 )
 REQUEST_ORGANIZATION_NAME_ERROR = (
-    '[bold red]Error: The two organization names you entered did not match. '
-    'Please try again.[/bold red]'
+    'Error: The two organization names you entered did not match. '
+    'Please try again.'
 )
 
 
@@ -86,80 +108,77 @@ def request_organization_name() -> str:
             rprint()
             rprint(REQUEST_ORGANIZATION_NAME_LINK)
             rprint()
+            first = False
 
-        organization_name_1 = input(REQUEST_ORGANIZATION_NAME_PROMPT)
-        rprint()
+        exists = False
+        while not exists:
+            organization_name_1 = input(REQUEST_ORGANIZATION_NAME_PROMPT)
+            rprint()
+            
+            # Verify organization exists
+            headers = {
+                'X-GitHub-Api-Version': '2026-03-10',
+                'Accept': 'application/vnd.github+json',
+            }
+            response = requests.get(
+                (f'https://api.github.com/orgs/{organization_name_1}'),
+                headers=headers
+            )
+            if response.status_code >= 200 and response.status_code < 300:
+                exists = True
+
+            if not exists:
+                rprint(
+                    (f'Error: GitHub Organization '
+                        f'"{organization_name_1}" not found.'),
+                    style='bold red'
+                )
+                rprint()
         organization_name_2 = input(REQUEST_ORGANIZATION_NAME_REPROMPT)
         rprint()
 
         matching = organization_name_1 == organization_name_2
         if not matching:
-            rprint_wrapped(REQUEST_ORGANIZATION_NAME_ERROR)
-
-        first = False
+            rprint_wrapped(REQUEST_ORGANIZATION_NAME_ERROR, style='bold red')
 
     return organization_name_1
 
 
-REQUEST_FG_PAT_MESSAGE_1 = (
-    'In order to set up your classroom, a short-term (e.g., 1-day-expiration) '
-    'GitHub finegrained '
-    'personal access token (FG PAT) is '
-    'required. The FG PAT should be configured as follows:'
-)
-REQUEST_FG_PAT_MESSAGE_2 = (
-    'Repository access: All repositories\n'
-    'Permissions:\n'
-    '- Repositories -> Administration: Read and write\n'
-    '- Repositories -> Contents: Read and write\n'
-    '- Repositories -> Pages: Read and write\n'
-    '- Repositories -> Secrets: Read and write\n'
-    '- Repositories -> Variables: Read and write\n'
-    '- Repositories -> Workflows: Read and write\n'
-    '- Repositories -> Metadata: Read-only\n\n'
-    'Please create an FG PAT by following the below link.'
-)
-REQUEST_FG_PAT_LINK = (
-    'https://github.com/settings/personal-access-tokens/new'
-)
-REQUEST_FG_PAT_PROMPT = 'Paste your FG PAT here and press enter: '
-REQUEST_FG_PAT_REPROMPT = (
-    'For confirmation, please paste your FG PAT here again and press enter: '
-)
-REQUEST_FG_PAT_ERROR_MESSAGE = (
-    '[bold red]Error: Your two pasted FG PATs did not match. Please try '
-    'again.[/bold red]'
-)
+def generate_and_sign_jwt(client_id: str, private_key: str) -> str:
+    payload = {
+        'iat': int(time.time()) - 60,
+        'exp': int(time.time()) - 60 + 600,
+        'iss': client_id
+    }
+    encoded_jwt = jwt.encode(payload, private_key, algorithm='RS256')
+    return encoded_jwt
 
 
-def request_fg_pat(organization_name: str) -> str:
-    matching = False
-    first = True
-    while not matching:
-        if first:
-            rprint_wrapped(REQUEST_FG_PAT_MESSAGE_1)
-            rprint()
-            rprint_wrapped(f'Resource Owner: {organization_name}')
-            rprint_wrapped(REQUEST_FG_PAT_MESSAGE_2)
-            rprint()
-            rprint(REQUEST_FG_PAT_LINK)
-            rprint()
-        
-        fg_pat_1: str = \
-            pwinput.pwinput(prompt=REQUEST_FG_PAT_PROMPT, mask='*')
-        rprint()
-        fg_pat_2: str = \
-            pwinput.pwinput(prompt=REQUEST_FG_PAT_REPROMPT, mask='*')
-        rprint()
-        matching = fg_pat_1 == fg_pat_2
+def get_installation_access_token(
+        client_id: str,
+        private_key: str,
+        installation_id: str) -> Json:
+    encoded_jwt = generate_and_sign_jwt(client_id, private_key)
 
-        if not matching:
-            rprint_wrapped(REQUEST_FG_PAT_ERROR_MESSAGE)
-            rprint()
+    # Exchange JWT for installation access token and
+    # repository_selection value
+    headers = {
+        'X-GitHub-Api-Version': '2026-03-10',
+        'Accept': 'application/vnd.github+json',
+        'Authorization': f'Bearer {encoded_jwt}'
+    }
+    response = requests.post(
+        (f'https://api.github.com/app/installations/'
+            f'{installation_id}/access_tokens'),
+        headers=headers
+    )
 
-        first = False
+    if response.status_code < 200 or response.status_code >= 300:
+        raise ValueError(f'Got HTTP status code {response.status_code} '
+            f'when generating installation access token')
 
-    return fg_pat_1
+    response_json = response.json()
+    return response_json
 
 
 class NotifyingServer(ThreadingHTTPServer):
@@ -219,18 +238,20 @@ class RepositoryCreationData:
 type Json = typing.Any
 type Repository = Json
 
+type InstallationVerifier =\
+    typing.Callable[[str, list[Repository] | None], bool]
 
 class AppDetails:
     installation_instructions: str
     installation_configuration_error_message: str
     next_registration_endpoint: str | None
-    installation_verifier: typing.Callable[[str, list[Repository] | None], bool]
+    installation_verifier: InstallationVerifier
     
     def __init__(
             self,
             installation_instructions: str,
             installation_configuration_error_message: str,
-            installation_verifier: typing.Callable[[str, list[Repository] | None], bool],
+            installation_verifier: InstallationVerifier,
             next_registration_endpoint: str | None = None) -> None:
         self.installation_instructions = installation_instructions
         self.installation_configuration_error_message =\
@@ -241,19 +262,23 @@ class AppDetails:
 
 class HandlerContext:
     @staticmethod
+    def verify_classroom_setup_installation(
+            repository_selection: str,
+            repositories: list[Repository] | None) -> bool:
+        return repository_selection == 'all'
+
+
+    @staticmethod
     def verify_workflow_dispatch_installation(
             repository_selection: str,
             repositories: list[Repository] | None) -> bool:
         if repository_selection != 'selected':
-            rprint(f'bad selection: {repository_selection}')
             return False
 
         if repositories is None or len(repositories) != 1:
-            rprint(f'bad repositories length: {repositories if repositories is None else len(repositories)}')
             return False
         
         if repositories[0]['name'] != 'backend-workflows':
-            rprint(f'bad repo name: {repositories[0]['name']}')
             return False
 
         return True
@@ -275,56 +300,86 @@ class HandlerContext:
 
     # TODO consolidate the various app-specific constants / dicts into
     # APP_DETAILS
-    REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT = \
+    CLASSROOM_SETUP_APP_ENDPOINT = \
+        'classroom-setup-app'
+    WORKFLOW_DISPATCH_APP_ENDPOINT = \
         'workflow-dispatch-app'
-    REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT = \
+    ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT = \
         'assignment-template-reading-app'
-    REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT = \
+    STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT = \
         'student-assignment-writing-app'
     APP_MANIFEST_ENDPOINTS = [
-        REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT,
-        REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
-        REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT,
+        CLASSROOM_SETUP_APP_ENDPOINT,
+        WORKFLOW_DISPATCH_APP_ENDPOINT,
+        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
+        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT,
     ]
     APP_NAMES = {
-        REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT: \
+        CLASSROOM_SETUP_APP_ENDPOINT: \
+            'Classroom Setup',
+        WORKFLOW_DISPATCH_APP_ENDPOINT: \
             'Backend Workflow Dispatch',
-        REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: \
+        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: \
             'Assignment Template Reading',
-        REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: \
+        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: \
             'Student Assignment Writing'
     }
     APP_DESCRIPTIONS = {
-        REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT: ('App embedded in '
+        CLASSROOM_SETUP_APP_ENDPOINT: ('Temporary app used to '
+            'automate the setup process for the classroom. '
+            'The setup script automatically uninstalls this app (but does not '
+            'unregister it) when the setup is complete.'),
+        WORKFLOW_DISPATCH_APP_ENDPOINT: ('App embedded in '
             'classroom\'s student-facing web frontend. Used to dispatch '
             'backend workflows (e.g., to authenticate students and accept '
             'assignments).'),
-        REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: ('App used to '
+        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: ('App used to '
             'generate, populate, and generate invites for student '
             'assignment repositories.'),
-        REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: ('App used to '
+        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: ('App used to '
             'read assignment template repository contents for configuring '
             'and initializing student assignment repositories upon assignment '
             'acceptance.')
     }
     APP_PERMISSIONS = {
-        REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT: {
+        CLASSROOM_SETUP_APP_ENDPOINT: {
+            'administration': 'write',
+            'contents': 'write',
+            'pages': 'write',
+            'secrets': 'write',
+            'actions_variables': 'write',
+            'workflows': 'write',
+            'metadata': 'read'
+        },
+        WORKFLOW_DISPATCH_APP_ENDPOINT: {
             'actions': 'write',
             'contents': 'read',
             'metadata': 'read'
         },
-        REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: {
+        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: {
             'administration': 'write',
             'contents': 'write',
             'metadata': 'read'
         },
-        REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: {
+        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: {
             'contents': 'read',
             'metadata': 'read'
         }
     }
     APP_DETAILS = {
-        REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT: AppDetails(
+        CLASSROOM_SETUP_APP_ENDPOINT: AppDetails(
+            installation_instructions=('Install the classroom setup app '
+                'in your GitHub Organization '
+                'on ALL repositories. Note: The setup script will uninstall '
+                'this app once the setup is complete.'),
+            installation_configuration_error_message=('The classroom setup '
+                'app must be installed on ALL (not selected) repositories.'),
+            next_registration_endpoint=\
+                WORKFLOW_DISPATCH_APP_ENDPOINT,
+            installation_verifier=\
+                verify_classroom_setup_installation
+        ),
+        WORKFLOW_DISPATCH_APP_ENDPOINT: AppDetails(
             installation_instructions=('Install the workflow dispatch app '
                 'in your GitHub Organization '
                 'on the "backend-workflows" repository. CRITICAL: '
@@ -332,14 +387,14 @@ class HandlerContext:
                 'repository. Do NOT install it on all repositories.'),
             installation_configuration_error_message=('For security reasons, '
                 'the workflow dispatch '
-                'app must be installed on, and ONLY on, the "backend-workflows" '
-                'repository.'),
+                'app must be installed on, and ONLY on, the '
+                '"backend-workflows" repository.'),
             next_registration_endpoint=\
-                REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT,
+                STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT,
             installation_verifier=\
                 verify_workflow_dispatch_installation
         ),
-        REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: AppDetails(
+        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: AppDetails(
             installation_instructions=(f'Install the student assignment '
                 'writing app in your GitHub '
                 'Organization on ALL repositories.'),
@@ -347,11 +402,11 @@ class HandlerContext:
                 'writing app must be installed on ALL (not selected) '
                 'repositories.'),
             next_registration_endpoint=\
-                REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
+                ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
             installation_verifier=\
                 verify_assignment_template_reading_installation
         ),
-        REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: AppDetails(
+        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: AppDetails(
             installation_instructions=(f'Install the assignment template '
                 'reading app in your GitHub '
                 'Organization on ALL repositories.'),
@@ -364,30 +419,31 @@ class HandlerContext:
     }
     content_events: dict[str, threading.Event]
     organization_name: str
-    fg_pat: str
     server_port: int | None
     all_repository_creation_data: dict[str, RepositoryCreationData]
     app_registration_responses: dict[str, AppRegistrationResponse]
     app_installation_responses: dict[str, AppInstallationResponse]
     state_string: str | None
+    repositories_created_event: threading.Event
+    classroom_setup_token: str | None
+    first_visit: bool
     
     def __init__(
             self,
-            organization_name: str,
-            fg_pat: str,
-            all_repository_creation_data: dict[str, RepositoryCreationData])\
-            -> None:
+            organization_name: str) -> None:
         self.organization_name = organization_name
-        self.fg_pat = fg_pat
         self.content_events = {
             endpoint: threading.Event() for endpoint in \
                 self.APP_MANIFEST_ENDPOINTS
         }
         self.server_port = None
-        self.all_repository_creation_data = all_repository_creation_data
+        self.all_repository_creation_data = {}
         self.app_registration_responses = {}
         self.app_installation_responses = {}
         self.state_string = None
+        self.repositories_created_event = threading.Event()
+        self.classroom_setup_token = None
+        self.first_visit = False
 
 
 URL_CHARS="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_"
@@ -407,7 +463,7 @@ def get_handler_class(context: HandlerContext) -> type:
                 json.dumps(context.APP_PERMISSIONS[registration_endpoint])
             state_string = secure_random_url_string(32)
             context.state_string = state_string
-            html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Next action item: register the {app_name} app on GitHub.</div><form id="manifest-form" action="https://github.com/organizations/{context.organization_name}/settings/apps/new?state={state_string}" method="post">
+            html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Please do not close this tab</div><div style="margin-bottom: 1em">Next action item: register the {app_name} app on GitHub.</div><form id="manifest-form" action="https://github.com/organizations/{context.organization_name}/settings/apps/new?state={state_string}" method="post">
 <input type="hidden" name="manifest" id="manifest">
 <input type="submit" value="Click here to begin action item">
 </form></div>
@@ -438,21 +494,28 @@ window.addEventListener('DOMContentLoaded', () => {{
             self.wfile.write(html.encode('utf-8'))
 
 
-        def register_workflow_dispatch_app(self) -> None:
+        def register_classroom_setup_app(self) -> None:
             self.register_app(
-                context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                context.CLASSROOM_SETUP_APP_ENDPOINT
+            )
+
+
+        def register_workflow_dispatch_app(self) -> None:
+            context.repositories_created_event.wait()
+            self.register_app(
+                context.WORKFLOW_DISPATCH_APP_ENDPOINT
             )
 
 
         def register_student_assignment_writing_app(self) -> None:
             self.register_app(
-                context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
             )
 
 
         def register_assignment_template_reading_app(self) -> None:
             self.register_app(
-                context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
             )
 
 
@@ -512,7 +575,7 @@ window.addEventListener('DOMContentLoaded', () => {{
                 installation_url
             )
 
-            html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Next action item: {context.APP_DETAILS[registration_endpoint].installation_instructions}</div><form id="manifest-form" action="{installation_url}" method="get">
+            html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Please do not close this tab</div><div style="margin-bottom: 1em">Next action item: {context.APP_DETAILS[registration_endpoint].installation_instructions}</div><form id="manifest-form" action="{installation_url}" method="get">
 <input type="submit" value="Click here to begin action item">
 </form></div></body></html>
 '''
@@ -523,21 +586,27 @@ window.addEventListener('DOMContentLoaded', () => {{
             self.wfile.write(html.encode('utf-8'))
 
 
+        def install_classroom_setup_app(self) -> None:
+            self.install_app(
+                context.CLASSROOM_SETUP_APP_ENDPOINT
+            )
+
+
         def install_workflow_dispatch_app(self) -> None:
             self.install_app(
-                context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                context.WORKFLOW_DISPATCH_APP_ENDPOINT
             )
 
 
         def install_student_assignment_writing_app(self) -> None:
             self.install_app(
-                context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
             )
 
 
         def install_assignment_template_reading_app(self) -> None:
             self.install_app(
-                context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
             )
 
         
@@ -545,7 +614,6 @@ window.addEventListener('DOMContentLoaded', () => {{
                 self,
                 registration_endpoint: str)\
                 -> tuple[str, list[Repository] | None]:
-            # Get client id, private key, installation id
             client_id = context.app_registration_responses[
                 registration_endpoint
             ].client_id
@@ -556,34 +624,14 @@ window.addEventListener('DOMContentLoaded', () => {{
                 registration_endpoint
             ].installation_id
 
-            # Generate JWT and sign with private key
-            payload = {
-                'iat': int(time.time()) - 60,
-                'exp': int(time.time()) - 60 + 600,
-                'iss': client_id
-            }
-            encoded_jwt = jwt.encode(payload, private_key, algorithm='RS256')
-
-            # Exchange JWT for installation access token and
-            # repository_selection value
-            headers = {
-                'X-GitHub-Api-Version': '2026-03-10',
-                'Accept': 'application/vnd.github+json',
-                'Authorization': f'Bearer {encoded_jwt}'
-            }
-            response = requests.post(
-                (f'https://api.github.com/app/installations/'
-                    f'{installation_id}/access_tokens'),
-                headers=headers
+            installation_access_token_data = get_installation_access_token(
+                client_id,
+                private_key,
+                installation_id
             )
-
-            if response.status_code < 200 or response.status_code >= 300:
-                raise ValueError(f'Got HTTP status code {response.status_code} '
-                    f'when generating installation access token')
-
-            response_json = response.json()
-            installation_access_token = response_json['token']
-            repository_selection = response_json['repository_selection']
+            installation_access_token = installation_access_token_data['token']
+            repository_selection = \
+                installation_access_token_data['repository_selection']
 
             repositories = None
             if repository_selection == 'selected':
@@ -608,7 +656,9 @@ window.addEventListener('DOMContentLoaded', () => {{
             return repository_selection, repositories
 
 
-        def setup_app(self, registration_endpoint: str) -> None:
+        def setup_app(
+                self,
+                registration_endpoint: str) -> None:
             app_name = context.APP_NAMES[
                 registration_endpoint
             ]
@@ -625,7 +675,6 @@ window.addEventListener('DOMContentLoaded', () => {{
             context.app_installation_responses[
                     registration_endpoint
             ] = AppInstallationResponse(installation_id)
-
             
             # Verify that the user configured the installation properly,
             # giving it access to the correct repositories
@@ -641,7 +690,7 @@ window.addEventListener('DOMContentLoaded', () => {{
             if not verified:
                 # Bad config. Tell user to reconfigure. They'll be redirected
                 # here for another check when they do.
-                html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Error: {context.APP_DETAILS[registration_endpoint].installation_configuration_error_message}</div><form id="manifest-form" action="{context.app_registration_responses[registration_endpoint].installation_url}" method="get">
+                html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Please do not close this tab</div><div style="margin-bottom: 1em">Error: {context.APP_DETAILS[registration_endpoint].installation_configuration_error_message}</div><form id="manifest-form" action="{context.app_registration_responses[registration_endpoint].installation_url}" method="get">
     <input type="submit" value="Click here to reconfigure app installation">
     </form></div></body></html>
     '''
@@ -650,7 +699,7 @@ window.addEventListener('DOMContentLoaded', () => {{
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(html.encode('utf-8'))
-                
+                return
 
             # Else, installation was configured properly. 
             next_registration_endpoint = \
@@ -659,7 +708,7 @@ window.addEventListener('DOMContentLoaded', () => {{
             if next_registration_endpoint is None:
                 # No more apps to register. Direct user to
                 # close the browser window and return to their terminal.
-                html=f'<html><head><meta http-equiv="Cache-Control" content="no-cache"/><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Browser flow complete. Please close this browser tab and return to your terminal for the next steps.</div></div></body></html>'
+                html=f'<html><head><meta http-equiv="Cache-Control" content="no-cache"/><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Browser flow complete. Please close this browser tab and return to your terminal.</div></div></body></html>'
 
                 self.send_response(200)
                 self.send_header('Content-type', 'text/html')
@@ -680,44 +729,63 @@ window.addEventListener('DOMContentLoaded', () => {{
             ].set()
 
 
+        def setup_classroom_setup_app(self) -> None:
+            self.setup_app(
+                context.CLASSROOM_SETUP_APP_ENDPOINT
+            )
+
+
         def setup_workflow_dispatch_app(self) -> None:
             self.setup_app(
-                context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                context.WORKFLOW_DISPATCH_APP_ENDPOINT
             )
 
 
         def setup_student_assignment_writing_app(self) -> None:
             self.setup_app(
-                context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
             )
 
 
         def setup_assignment_template_reading_app(self) -> None:
             self.setup_app(
-                context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
             )
             
 
         path_handlers = {
-            f'/{context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT}': \
+            f'/{context.CLASSROOM_SETUP_APP_ENDPOINT}': \
+                register_classroom_setup_app,
+            f'/{context.CLASSROOM_SETUP_APP_ENDPOINT}/install': \
+                install_classroom_setup_app,
+            f'/{context.CLASSROOM_SETUP_APP_ENDPOINT}/setup': \
+                setup_classroom_setup_app,
+            f'/{context.WORKFLOW_DISPATCH_APP_ENDPOINT}': \
                 register_workflow_dispatch_app,
-            f'/{context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT}/install': \
+            f'/{context.WORKFLOW_DISPATCH_APP_ENDPOINT}/install': \
                 install_workflow_dispatch_app,
-            f'/{context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT}/setup': \
+            f'/{context.WORKFLOW_DISPATCH_APP_ENDPOINT}/setup': \
                 setup_workflow_dispatch_app,
-            f'/{context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}': \
+            f'/{context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}': \
                 register_student_assignment_writing_app,
-            f'/{context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}/install': \
+            f'/{context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}/install': \
                 install_student_assignment_writing_app,
-            f'/{context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}/setup': \
+            f'/{context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}/setup': \
                 setup_student_assignment_writing_app,
-            f'/{context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}': \
+            f'/{context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}': \
                 register_assignment_template_reading_app,
-            f'/{context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}/install': \
+            f'/{context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}/install': \
                 install_assignment_template_reading_app,
-            f'/{context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}/setup': \
+            f'/{context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}/setup': \
                 setup_assignment_template_reading_app,
         }
+
+
+        INITIATED_BROWSER_FLOW_MESSAGE = ('User has initiated browser flow')
+        DO_NOT_EXIT_MESSAGE = ('Please do not exit your browser until '
+            'the browser flow is completed. If you accidentally exit out of '
+            'a page, refer to the bottom-most log message below for the '
+            'address of your most recently visited page')
 
 
         def do_GET(self) -> None:
@@ -728,6 +796,16 @@ window.addEventListener('DOMContentLoaded', () => {{
 
             # Find path handler and execute, else send 404
             if paramless_path in Handler.path_handlers:
+                if not context.first_visit:
+                    context.first_visit = True
+                    console.clear()
+                    console.log(Handler.INITIATED_BROWSER_FLOW_MESSAGE)
+                    rprint()
+                    rprint_wrapped(Handler.DO_NOT_EXIT_MESSAGE)
+                    rprint()
+                
+                console.log(f'User visited localhost address: '
+                    f'http://localhost:{context.server_port}{self.path}')
                 Handler.path_handlers[paramless_path](self)
             else:
                 self.send_response(404)
@@ -755,7 +833,7 @@ class ServerState:
 
 
 MIN_PORT = 8000
-MAX_PORT = 8100
+MAX_PORT = 8004
 
 
 def start_server_thread_entry(server_state: ServerState) -> None:
@@ -781,7 +859,7 @@ def start_server_thread_entry(server_state: ServerState) -> None:
 
 
 START_SERVER_ERROR_MESSAGE = (
-    f'[bold red]Error: Failed to start server. Make sure there\'s an open '
+    f'Error: Failed to start server. Make sure there\'s an open '
     f'port in the range [{MIN_PORT}, {MAX_PORT}] that isn\'t blocked by '
     f'firewall rules.'
 )
@@ -798,8 +876,11 @@ def start_server(server_state: ServerState) -> threading.Thread:
 
 
 BROWSER_FLOW_MESSAGE_1 = (
-    'Next, your organization will need three private GitHub Apps '
+    'Next, your organization will need four private GitHub Apps '
     'for, respectively:\n'
+    '- (temporary) automating most of the operations in this setup tool '
+    '(note: this app will uninstall itself once your classroom is fully set '
+    'up)\n'
     '- dispatching backend workflows from the web frontend to '
     'authenticate students and allow them to accept assignments\n'
     '- reading assignment template code and configurations\n'
@@ -811,13 +892,15 @@ BROWSER_FLOW_MESSAGE_1 = (
 )
 
 
-def browser_flow(handler_context: HandlerContext) -> None:
+def start_browser_flow(
+        handler_context: HandlerContext) \
+        -> tuple[ServerState, threading.Thread]:
     server_state = ServerState(
         handler_context
     )
     server_thread = start_server(server_state)
     if not server_state.up:
-        rprint(START_SERVER_ERROR_MESSAGE)
+        rprint_wrapped(START_SERVER_ERROR_MESSAGE, style='bold red')
         raise OSError('Failed to start server')
 
     console.log(
@@ -830,8 +913,13 @@ def browser_flow(handler_context: HandlerContext) -> None:
     rprint()
     rprint(f'http://localhost:'
         f'{server_state.context.server_port}/'
-        f'{server_state.context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT}')
+        f'{server_state.context.CLASSROOM_SETUP_APP_ENDPOINT}')
 
+    return server_state, server_thread
+
+def wait_for_browser_flow_finish(
+        server_state: ServerState,
+        server_thread: threading.Thread) -> None:
     for _, event in server_state.context.content_events.items():
         event.wait()
 
@@ -882,7 +970,7 @@ ALL_REPOSITORY_INPUT_DATA = {
     ),
     'assignment-templates': RepositoryInputData(
         description=('This repository contains '
-            'assignment configuration files, as well as assignment templates '
+            'assignment configuration files as well as assignment templates '
             '(starter code) '
             'that are copied into students\' assignment repositories '
             'upon creation (assignment acceptance).'),
@@ -893,13 +981,13 @@ ALL_REPOSITORY_INPUT_DATA = {
 
 def create_repository(
         organization_name: str,
-        fg_pat: str,
+        classroom_setup_token: str,
         repository_name: str,
         input_data: RepositoryInputData) -> RepositoryCreationData:
     headers = {
         'X-GitHub-Api-Version': '2026-03-10',
         'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {fg_pat}'
+        'Authorization': f'Bearer {classroom_setup_token}'
     }
     
     # Check if repo already exists.
@@ -940,14 +1028,15 @@ def create_repository(
 
 def create_repositories(
         organization_name: str,
-        fg_pat: str) -> dict[str, RepositoryCreationData]:
+        classroom_setup_token: str)\
+        -> dict[str, RepositoryCreationData]:
     result = {}
     for repository_name, input_data in ALL_REPOSITORY_INPUT_DATA.items():
-        console.log(f'Creating repository {repository_name} in organization '
-            f'{organization_name}...')
+        console.log(f'Creating repository "{repository_name}" in organization '
+            f'"{organization_name}"...')
         result[repository_name] = create_repository(
             organization_name,
-            fg_pat,
+            classroom_setup_token,
             repository_name,
             input_data
         )
@@ -957,21 +1046,22 @@ def create_repositories(
 
 def create_repository_variable(
         organization_name: str,
-        fg_pat: str,
+        classroom_setup_token: str,
         repository_name: str,
         variable_name: str,
         variable_value: str) -> None:
     headers = {
         'X-GitHub-Api-Version': '2026-03-10',
         'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {fg_pat}'
+        'Authorization': f'Bearer {classroom_setup_token}'
     }
     body = {
         'name': variable_name,
         'value': variable_value
     }
     response = requests.post(
-        f'https://api.github.com/repos/{organization_name}/{repository_name}/actions/variables',
+        (f'https://api.github.com/repos/'
+            f'{organization_name}/{repository_name}/actions/variables'),
         headers=headers,
         json=body
     )
@@ -979,13 +1069,14 @@ def create_repository_variable(
     if response.status_code == 409:
         # Variable already exists. Update it.
         response = requests.patch(
-            f'https://api.github.com/repos/{organization_name}/{repository_name}/actions/variables/{variable_name}',
+            (f'https://api.github.com/repos/{organization_name}/'
+                f'{repository_name}/actions/variables/{variable_name}'),
             headers=headers,
             json=body
         )
         if response.status_code < 200 or response.status_code >= 300:
-            raise ValueError(f'Got HTTP status code {response.status_code} when '
-                f'updating repository variable')
+            raise ValueError(f'Got HTTP status code {response.status_code} '
+                f'when updating repository variable')
     elif response.status_code < 200 or response.status_code >= 300:
         # 201 means created, 409 means already exists (conflict). Anything else
         # is an unexpected error.
@@ -995,7 +1086,6 @@ def create_repository_variable(
 
 def create_repository_variables(
         organization_name: str,
-        fg_pat: str,
         handler_context: HandlerContext) -> None:
     all_variables = {
         'backend-workflows': [
@@ -1004,23 +1094,23 @@ def create_repository_variables(
                 f'github.com/{organization_name}/assignment-templates.git'),
             ('STUDENT_ASSIGNMENT_WRITING_APP_ID',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                    handler_context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
                 ].client_id),
             ('STUDENT_ASSIGNMENT_WRITING_APP_INSTALLATION_ID',
                 handler_context.app_installation_responses[
-                    handler_context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                    handler_context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
                 ].installation_id),
             ('ASSIGNMENT_TEMPLATE_READING_APP_ID',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                    handler_context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
                 ].client_id),
             ('ASSIGNMENT_TEMPLATE_READING_APP_INSTALLATION_ID',
                 handler_context.app_installation_responses[
-                    handler_context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                    handler_context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
                 ].installation_id),
             ('AUTH_CLIENT_ID',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                    handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].client_id),
         ],
         'web': [
@@ -1028,27 +1118,28 @@ def create_repository_variables(
             ('POLL_DELAY', '2000'),
             ('AUTH_CLIENT_ID',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                    handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].client_id),
             ('BACKEND_REPO_OWNER', organization_name),
             ('BACKEND_REPO', 'backend-workflows'),
             ('WORKFLOW_DISPATCH_APP_ID',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                    handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].client_id),
             ('WORKFLOW_DISPATCH_APP_INSTALLATION_ID',
                 handler_context.app_installation_responses[
-                    handler_context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                    handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].installation_id),
         ]
     }
     
+    assert handler_context.classroom_setup_token is not None
     for repository, variables in all_variables.items():
         for name, value in variables:
             console.log(f'Creating repository variable {name}={value}...')
             create_repository_variable(
                 organization_name,
-                fg_pat,
+                handler_context.classroom_setup_token,
                 repository,
                 name,
                 value
@@ -1058,14 +1149,16 @@ def create_repository_variables(
 def get_repository_public_key(
         organization_name: str,
         repository_name: str,
-        fg_pat: str) -> tuple[public.PublicKey, str]:
+        classroom_setup_token: str)\
+        -> tuple[public.PublicKey, str]:
     headers = {
         'X-GitHub-Api-Version': '2026-03-10',
         'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {fg_pat}'
+        'Authorization': f'Bearer {classroom_setup_token}'
     }
     response = requests.get(
-        f'https://api.github.com/repos/{organization_name}/{repository_name}/actions/secrets/public-key',
+        (f'https://api.github.com/repos/{organization_name}/'
+            f'{repository_name}/actions/secrets/public-key'),
         headers=headers
     )
     
@@ -1089,7 +1182,7 @@ def encrypt(public_key: public.PublicKey, plaintext: str) -> str:
 
 def create_repository_secret(
         organization_name: str,
-        fg_pat: str,
+        classroom_setup_token: str,
         repository_name: str,
         secret_name: str,
         secret_value: str,
@@ -1099,14 +1192,15 @@ def create_repository_secret(
     headers = {
         'X-GitHub-Api-Version': '2026-03-10',
         'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {fg_pat}'
+        'Authorization': f'Bearer {classroom_setup_token}'
     }
     body = {
         'encrypted_value': encrypted_value,
         'key_id': key_id
     }
     response = requests.put(
-        f'https://api.github.com/repos/{organization_name}/{repository_name}/actions/secrets/{secret_name}',
+        (f'https://api.github.com/repos/{organization_name}/'
+            f'{repository_name}/actions/secrets/{secret_name}'),
         headers=headers,
         json=body
     )
@@ -1118,38 +1212,42 @@ def create_repository_secret(
 
 def create_repository_secrets(
         organization_name: str,
-        fg_pat: str,
         handler_context: HandlerContext) -> None:
     all_secrets = {
         'backend-workflows': [
             ('AUTH_CLIENT_SECRET',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                    handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].client_secret),
             ('STUDENT_ASSIGNMENT_WRITING_APP_PRIVATE_KEY',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                    handler_context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
                 ].private_key),
             ('ASSIGNMENT_TEMPLATE_READING_APP_PRIVATE_KEY',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                    handler_context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
                 ].private_key),
         ],
         'web': [
             ('WORKFLOW_DISPATCH_APP_PRIVATE_KEY',
                 handler_context.app_registration_responses[
-                    handler_context.REGISTER_WORKFLOW_DISPATCH_APP_ENDPOINT
+                    handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].private_key),
         ]
     }
     
+    assert handler_context.classroom_setup_token is not None
     for repository, secrets in all_secrets.items():
-        public_key, key_id = get_repository_public_key(organization_name, repository, fg_pat)
+        public_key, key_id = get_repository_public_key(
+            organization_name,
+            repository,
+            handler_context.classroom_setup_token
+        )
         for name, value in secrets:
             console.log(f'Creating repository secret {name}...')
             create_repository_secret(
                 organization_name,
-                fg_pat,
+                handler_context.classroom_setup_token,
                 repository,
                 name,
                 value,
@@ -1158,11 +1256,13 @@ def create_repository_secrets(
             )
 
 
-def create_github_pages_site(organization_name: str, fg_pat: str) -> None:
+def create_github_pages_site(
+        organization_name: str,
+        classroom_setup_token: str) -> None:
     headers = {
         'X-GitHub-Api-Version': '2026-03-10',
         'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {fg_pat}'
+        'Authorization': f'Bearer {classroom_setup_token}'
     }
     body = {
         'build_type': 'workflow'
@@ -1181,35 +1281,17 @@ def create_github_pages_site(organization_name: str, fg_pat: str) -> None:
             json=body
         )
         if response.status_code < 200 or response.status_code >= 300:
-            raise ValueError(f'Got HTTP status code {response.status_code} when '
-                f'updating GitHub Pages site')
+            raise ValueError(f'Got HTTP status code {response.status_code} '
+                f'when updating GitHub Pages site')
     elif response.status_code < 200 or response.status_code >= 300:
         # Anything other than HTTP 201 / 409 is an error
         raise ValueError(f'Got HTTP status code {response.status_code} when '
             f'creating GitHub Pages site')
 
 
-def get_github_username(fg_pat: str) -> str:
-    headers = {
-        'X-GitHub-Api-Version': '2026-03-10',
-        'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {fg_pat}'
-    }
-    response = requests.get(
-        'https://api.github.com/user',
-        headers=headers
-    )
-    if response.status_code < 200 or response.status_code >= 300:
-        raise ValueError(f'Got HTTP status code {response.status_code} when '
-            f'retrieving GitHub username')
-    response_json = response.json()
-    return str(response_json['login'])
-
-
 def populate_repository(
         organization_name: str,
-        github_username: str,
-        fg_pat: str,
+        classroom_setup_token: str,
         repository_name: str,
         additional_relative_file_paths: list[str]) -> None:
     # Find this repo's root directory (closest ancestor containing .git
@@ -1237,7 +1319,8 @@ def populate_repository(
         with chdir(base_dst_dir_path):
             # Clone git repository
             remote_repo_git_url = (
-                f'https://{github_username}:{fg_pat}@github.com/'
+                f'https://x-access-token:'
+                f'{classroom_setup_token}@github.com/'
                 f'{organization_name}/{repository_name}.git'
             )
             subprocess.run(
@@ -1295,7 +1378,10 @@ def populate_repository(
                     relative_file_path
 
                 # Create parent directory within temp directory to house copy
-                complete_dst_file_path.parent.mkdir(parents=True, exist_ok=True)
+                complete_dst_file_path.parent.mkdir(
+                    parents=True,
+                    exist_ok=True
+                )
 
                 # Copy file / directory
                 if complete_src_file_path.is_file():
@@ -1334,18 +1420,60 @@ def populate_repository(
 
 def populate_repositories(
         organization_name: str,
-        github_username: str,
-        fg_pat: str) -> None:
+        classroom_setup_token: str) -> None:
     for repository_name, input_data in ALL_REPOSITORY_INPUT_DATA.items():
         console.log(f'Populating GitHub repository '
             f'"{organization_name}/{repository_name}"')
         populate_repository(
             organization_name,
-            github_username,
-            fg_pat,
+            classroom_setup_token,
             repository_name,
             input_data.additional_relative_file_paths
         )
+
+
+def uninstall_app(
+        client_id: str,
+        private_key: str,
+        installation_id: str) -> None:
+    encoded_jwt = generate_and_sign_jwt(client_id, private_key)
+
+    # Use JWT to delete installation
+    headers = {
+        'X-GitHub-Api-Version': '2026-03-10',
+        'Accept': 'application/vnd.github+json',
+        'Authorization': f'Bearer {encoded_jwt}'
+    }
+    response = requests.delete(
+        (f'https://api.github.com/app/installations/{installation_id}'),
+        headers=headers
+    )
+
+    if response.status_code < 200 or response.status_code >= 300:
+        raise ValueError(f'Got HTTP status code {response.status_code} '
+            f'when deleting app installation')
+
+
+def exit_notes(organization_name: str) -> None:
+    rprint_wrapped('Configuration complete.')
+    rprint(f'- You can now create assignments in your classroom '
+        f'organization\'s "assignment-templates" repository:')
+    rprint()
+    rprint(f'https://github.com/{organization_name}/assignment-templates')
+    rprint()
+    rprint_wrapped(f'- Students can accept assignments by navigating to')
+    rprint()
+    rprint(f'https://{organization_name}.github.io/web?'
+        'assignment-name=ASSIGNMENT_NAME&'
+        'assignment-accept-key=ASSIGNMENT_ACCEPT_KEY')
+    rprint()
+    rprint(f'where ASSIGNMENT_NAME is the name of the '
+        f'assignment\'s directory '
+        f'in the "assignment-templates" repository, and '
+        f'ASSIGNMENT_ACCEPT_KEY is the assignment\'s accept key as '
+        f'configured in the "assignment-templates" repository. See your '
+        f'"assignment-templates" repository\'s README.md file for more '
+        f'information.')
 
 
 def main() -> int:
@@ -1355,29 +1483,63 @@ def main() -> int:
     organization_name = request_organization_name()
 
     console.clear()
-    fg_pat = request_fg_pat(organization_name)
-    github_username = get_github_username(fg_pat)
+    handler_context = HandlerContext(
+        organization_name
+    )
+    server_state, server_thread = start_browser_flow(handler_context)
 
-    console.clear()
+    handler_context.content_events[
+        handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+    ].wait()
+
+    handler_context.classroom_setup_token = \
+        get_installation_access_token(
+            handler_context.app_registration_responses[
+                handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+            ].client_id,
+            handler_context.app_registration_responses[
+                handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+            ].private_key,
+            handler_context.app_installation_responses[
+                handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+            ].installation_id
+        )['token']
+
     all_repository_creation_data = create_repositories(
         organization_name,
-        fg_pat
+        handler_context.classroom_setup_token
     )
 
-    console.clear()
-    handler_context = HandlerContext(
-        organization_name,
-        fg_pat,
-        all_repository_creation_data
-    )
-    browser_flow(handler_context)
+    handler_context.repositories_created_event.set()
+
+    wait_for_browser_flow_finish(server_state, server_thread)
 
     console.clear()
     
-    create_repository_variables(organization_name, fg_pat, handler_context)
-    create_repository_secrets(organization_name, fg_pat, handler_context)
-    create_github_pages_site(organization_name, fg_pat)
-    populate_repositories(organization_name, github_username, fg_pat)
+    create_repository_variables(organization_name, handler_context)
+    create_repository_secrets(organization_name, handler_context)
+    create_github_pages_site(
+        organization_name,
+        handler_context.classroom_setup_token
+    )
+    populate_repositories(
+        organization_name,
+        handler_context.classroom_setup_token
+    )
+    uninstall_app(
+        handler_context.app_registration_responses[
+            handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+        ].client_id,
+        handler_context.app_registration_responses[
+            handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+        ].private_key,
+        handler_context.app_installation_responses[
+            handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+        ].installation_id
+    )
+
+    console.clear()
+    exit_notes(organization_name)
 
     return 0
 
