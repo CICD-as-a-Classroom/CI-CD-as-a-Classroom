@@ -1,1 +1,3 @@
-# assignment-templates (assignment configuration and starter code templates)
+# Assignment templates and configuration
+
+(This guide does not yet exist)
