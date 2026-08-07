@@ -159,7 +159,6 @@ dependencies = [
     { name = "charset-normalizer" },
     { name = "cryptography" },
     { name = "idna" },
-    { name = "pwinput" },
     { name = "pyjwt" },
     { name = "pynacl" },
     { name = "requests" },
@@ -180,7 +179,6 @@ requires-dist = [
     { name = "charset-normalizer", specifier = "==3.4.9" },
     { name = "cryptography", specifier = ">=50.0.0" },
     { name = "idna", specifier = "==3.18" },
-    { name = "pwinput", specifier = ">=1.0.3" },
     { name = "pyjwt", specifier = ">=2.13.0" },
     { name = "pynacl", specifier = ">=1.6.2" },
     { name = "requests", specifier = "==2.34.2" },
@@ -358,12 +356,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/5a/82/42f767fc1c1143d6f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f1/d9/7fb5aa316bc299258e68c73ba3bddbc499654a07f151cba08f6153988714/pathspec-1.1.1-py3-none-any.whl", hash = "sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189", size = 57328, upload-time = "2026-04-27T01:46:07.06Z" },
 ]
-
-[[package]]
-name = "pwinput"
-version = "1.0.3"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/4b/c9/f6d03c2214c282251baa38c6be08f5b9f81f1ea488716cd2335e7e190b58/pwinput-1.0.3.tar.gz", hash = "sha256:ca1a8bd06e28872d751dbd4132d8637127c25b408ea3a349377314a5491426f3", size = 4433, upload-time = "2023-02-16T17:04:14.592Z" }
 
 [[package]]
 name = "pycparser"

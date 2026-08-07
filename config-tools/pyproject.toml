@@ -7,7 +7,6 @@ dependencies = [
     "charset-normalizer==3.4.9",
     "cryptography>=50.0.0",
     "idna==3.18",
-    "pwinput>=1.0.3",
     "pyjwt>=2.13.0",
     "pynacl>=1.6.2",
     "requests==2.34.2",
@@ -24,7 +23,3 @@ dev = [
 
 [tool.mypy]
 python_executable = ".venv/bin/python"
-
-[[tool.mypy.overrides]]
-module = ["pwinput"]
-ignore_missing_imports = true
