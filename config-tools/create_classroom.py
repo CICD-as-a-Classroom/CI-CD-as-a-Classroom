@@ -355,10 +355,8 @@ class HandlerContext:
             'metadata': 'read'
         },
         WORKFLOW_DISPATCH_APP_ENDPOINT: {
-            'actions': 'write', # TODO remove
-            'issues': 'write',
-            'contents': 'read', # TODO remove
-            'metadata': 'read' # TODO maybe remove?
+            'actions': 'read',
+            'issues': 'write'
         },
         STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: {
             'administration': 'write',

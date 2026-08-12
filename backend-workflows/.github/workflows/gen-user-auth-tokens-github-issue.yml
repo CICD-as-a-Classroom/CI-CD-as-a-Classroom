@@ -16,6 +16,10 @@ jobs:
       AUTH_CLIENT_ID: ${{ vars.AUTH_CLIENT_ID }}
       AUTH_CLIENT_SECRET: ${{ secrets.AUTH_CLIENT_SECRET }}
       CLASSROOM_RSA_PRIVATE_KEY: ${{ secrets.CLASSROOM_RSA_PRIVATE_KEY }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GITHUB_EVENT_ISSUE_BODY: ${{ github.event.issue.body }}
+      GITHUB_EVENT_ISSUE_NUMBER: ${{ github.event.issue.number }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     permissions:
       contents: read
       issues: write
@@ -34,7 +38,7 @@ jobs:
         run: |
           # Use node script to decode issue body and decrypt via
           # CLASSROOM_RSA_PRIVATE_KEY
-          workflow_inputs_json=$(node repo/workflow-util/decodeissuebody.js --data="${{ github.event.issue.body }}")
+          workflow_inputs_json=$(node repo/workflow-util/decodeissuebody.js --data="$GITHUB_EVENT_ISSUE_BODY")
 
           AUTH_CODE=$(echo "$workflow_inputs_json" | jq -r '.authCode')
           PKCE_CODE_VERIFIER=$(echo "$workflow_inputs_json" | jq -r '.pkceCodeVerifier')
@@ -49,9 +53,9 @@ jobs:
           post_comment_status=$(curl -s -o curl.json -w "%{http_code}" -L \
             -X POST \
             -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "X-GitHub-Api-Version: 2026-03-10" \
-            "https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$GITHUB_EVENT_ISSUE_NUMBER/comments" \
             -d '{"body":"'"$issue_comment"'"}')
 
           if [[ "$post_comment_status" != "201" ]]
