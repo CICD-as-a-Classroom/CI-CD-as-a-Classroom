@@ -64,6 +64,49 @@ export async function generateRSAKeys() {
     return keyPair
 }
 
+async function generateAESKey() {
+  const key = await window.crypto.subtle.generateKey(
+    {
+      name: 'AES-GCM',
+      length: 256,
+    },
+    true,
+    ['encrypt', 'decrypt']
+  );
+
+  return key;
+}
+
+async function encryptAES(plaintext, key) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: iv,
+    },
+    key,
+    plaintext
+  );
+
+  return {
+    ciphertext: new Uint8Array(ciphertext),
+    iv: iv
+  };
+}
+
+async function encryptRSA(plaintext, key) {
+  const ciphertext = await crypto.subtle.encrypt(
+    {
+      name: "RSA-OAEP"
+    },
+    key,
+    plaintext
+  );
+
+  return new Uint8Array(ciphertext);
+}
+
 export async function decryptAES(ciphertext, key, iv) {
   const plaintextBuffer = await crypto.subtle.decrypt(
     {
@@ -98,30 +141,88 @@ export async function getWorkflowDispatchAppInstallation() {
     return await workflowDispatchApp.getInstallationOctokit(siteConfig.workflowDispatchAppInstallationId);
 }
 
-export async function dispatchWorkflow(workflowDispatchAppInstallation, workflowID, workflowInputs, statusUpdateCallback, pollDelay) {
+async function getClassroomRSAPublicKey() {
+    const classroomRSAPublicKeyBase64 = siteConfig.classroomRSAPublicKey;
+    const classroomRSAPublicKeyBuffer = Uint8Array.fromBase64(classroomRSAPublicKeyBase64);
+    const classroomRSAPublicKey = await window.crypto.subtle.importKey(
+      'spki',
+      classroomRSAPublicKeyBuffer,
+      {
+        name: "RSA-OAEP",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]), // Equivalent to 65537
+        hash: "SHA-256",
+      },
+      true,
+      ['encrypt']
+    );
+    return classroomRSAPublicKey;
+}
+
+const classroomRSAPublicKey = await getClassroomRSAPublicKey();
+
+export async function dispatchWorkflowViaIssue(organizationName, workflowDispatchAppInstallation, workflowEventName, workflowInputs, statusUpdateCallback, pollDelay) {
     if (!pollDelay) {
         pollDelay = 2000;
     }
 
-    // Generate RSA key pair for securing workflow dispatch results
-    const keyPair = await generateRSAKeys();
+    // Generate RSA key pair. The backend will use the public key to encrypt
+    // workflow results. This function will then use the private key to
+    // decrypt them.
+    const resultRSAKeyPair = await generateRSAKeys();
 
-    // Export public key to SPKI format, then convert to Base64
-    const exportedPublic = await window.crypto.subtle.exportKey("spki", keyPair.publicKey);
-    const publicKeyBase64url =
-        new Uint8Array(exportedPublic)
+    // Export public key to SPKI format, then convert to Base64 and embed in
+    // workflow inputs
+    const exportedResponsePublicKey = await window.crypto.subtle.exportKey("spki", resultRSAKeyPair.publicKey);
+    const resultEncryptionKeyBase64url =
+        new Uint8Array(exportedResponsePublicKey)
         .toBase64({ alphabet: 'base64url', omitPadding: true });
     
     if (!workflowInputs) {
         workflowInputs = {};
     }
-    workflowInputs['resultEncryptionKey'] = publicKeyBase64url;
-    
-    let response;
+    workflowInputs['resultEncryptionKey'] = resultEncryptionKeyBase64url;
+
+    // Embed random verifier string in workflow inputs for preventing replay
+    // attacks / backend-workflow spoofing (perhaps a bit redundant since
+    // resultEncryptionKey is generated per-request)
+    const verifier = generateSecureString(32);
+    workflowInputs['verifier'] = verifier;
+
+    // Convert workflow inputs to buffer for encryption
+    const workflowInputsJson = JSON.stringify(workflowInputs);
+    const workflowInputsBuffer = new TextEncoder().encode(workflowInputsJson);
+
+    // Generate AES key and encrypt workflowInputsBuffer
+    const aesKey = await generateAESKey();
+    const encryptWorkflowInputsResult = await encryptAES(workflowInputsBuffer, aesKey);
+    const workflowInputsCiphertext = encryptWorkflowInputsResult.ciphertext;
+    const iv = encryptWorkflowInputsResult.iv;
+    const ivBase64 = iv.toBase64();
+    const workflowInputsCiphertextBase64 = workflowInputsCiphertext.toBase64();
+
+    // Encrypt AES key using classroom's public RSA key and encode in base64
+    const aesKeyBuffer = new Uint8Array(await window.crypto.subtle.exportKey('raw', aesKey));
+    const encryptedAESKey = await encryptRSA(aesKeyBuffer, classroomRSAPublicKey);
+    const encryptedAESKeyBase64 = encryptedAESKey.toBase64();
+
+    // Package into JSON, stringify, and base64-encode to serve as issue
+    // body
+    const issueBody = JSON.stringify({
+        aesKey: encryptedAESKeyBase64,
+        iv: ivBase64,
+        inputs: workflowInputsCiphertextBase64
+    });
+    const issueBodyBase64 = new TextEncoder().encode(issueBody).toBase64();
+
+    // Post issue
+    let postIssueResponse;
     try {
-        response = await workflowDispatchAppInstallation.request(`POST /repos/${siteConfig.backendRepoOwner}/${siteConfig.backendRepo}/actions/workflows/${workflowID}/dispatches`, {
-            ref: siteConfig.dispatchRef,
-            inputs: workflowInputs,
+        postIssueResponse = await workflowDispatchAppInstallation.request(`POST /repos/${organizationName}/backend-workflows/issues`, {
+            owner: organizationName,
+            repo: 'backend-workflows',
+            title: `[${workflowEventName}]`,
+            body: issueBodyBase64,
             headers: {
                 'X-GitHub-Api-Version': '2026-03-10'
             }
@@ -131,22 +232,93 @@ export async function dispatchWorkflow(workflowDispatchAppInstallation, workflow
         if (statusUpdateCallback) {
             statusUpdateCallback({
                 status: 'error',
-                message: 'Failed to dispatch workflow'
+                message: 'Failed to post workflow-dispatch issue'
             });
         }
         return;
     }
+
+    const issueNumber = postIssueResponse.data['number']
 
     if (statusUpdateCallback) {
         statusUpdateCallback({
             status: 'polling'
         });
     }
-    
-    // Get run url for polling
-    const runId = response.data['workflow_run_id'];
 
-    // Poll workflow run with delay between iterations until done.    
+    // Poll issue for response comment with workflow run ID
+    let issuePollResponse;
+    let runId = null;
+    do {
+        await sleep(pollDelay);
+
+        try {
+            issuePollResponse = await workflowDispatchAppInstallation.request(`GET /repos/${organizationName}/backend-workflows/issues/${issueNumber}/comments`, {
+                owner: organizationName,
+                repo: 'backend-workflows',
+                issue_number: issueNumber,
+                headers: {
+                    'X-GitHub-Api-Version': '2026-03-10',
+                    'If-None-Match': ''
+                }
+            });
+        } catch (error) {
+            console.log(error);
+            if (statusUpdateCallback) {
+                statusUpdateCallback({
+                    status: 'error',
+                    message: 'Failed to poll workflow run status'
+                });
+            }
+            return;
+        }
+        
+        for (const comment of issuePollResponse.data) {
+            if (comment['user']['type'] != 'Bot') {
+                // Response should be from backend workflow, authenticated via
+                // app installation access token, so the account type should
+                // be 'Bot'
+                continue;
+            }
+
+            const utf8Decoder = new TextDecoder('utf-8');
+            const commentResponseBodyJson = utf8Decoder.decode(Uint8Array.fromBase64(comment['body']));
+            const commentResponseBody = JSON.parse(commentResponseBodyJson);
+
+            const encryptedCommentResponseAESKeyBuffer = Uint8Array.fromBase64(commentResponseBody['aesKey']);
+            const commentResponseIV = Uint8Array.fromBase64(commentResponseBody['iv']);
+            const encryptedCommentPayload = Uint8Array.fromBase64(commentResponseBody['payload']);
+
+            // Decrypt encryptedCommentResponseAESKeyBuffer with resultRSAKeyPair.privateKey
+            const commentResponseAESKeyBuffer = await decryptRSA(encryptedCommentResponseAESKeyBuffer, resultRSAKeyPair.privateKey);
+            const commentResponseAESKey = await window.crypto.subtle.importKey(
+                'raw',
+                commentResponseAESKeyBuffer,
+                {
+                    name: 'AES-GCM',
+                    length: 256,
+                },
+                true,
+                ['encrypt', 'decrypt']
+            );
+
+            // Decrypt encryptedCommentPayload with commentResponseAESKey
+            const commentPayloadBuffer = await decryptAES(encryptedCommentPayload, commentResponseAESKey, commentResponseIV);
+            const commentPayloadJson = (new TextDecoder('utf-8')).decode(commentPayloadBuffer);
+            const commentPayload = JSON.parse(commentPayloadJson);
+
+            // Verify random state string to prevent replay attacks
+            if (commentPayload['verifier'] != verifier) {
+                continue;
+            }
+
+            // Store run ID and break loop
+            runId = commentPayload['runId'];
+            break;
+        }
+    } while(runId === null);
+
+    // Poll workflow run until done
     let runStatus = null;
     let runConclusion = null;
     let pollResponse;
@@ -279,12 +451,12 @@ export async function dispatchWorkflow(workflowDispatchAppInstallation, workflow
         return;
     }
 
-    // Decrypt contained AES key using RSA private key
-    const encryptedAESKey = await secureZip.files['aes-key.enc'].async('uint8array');
-    const aesKeyBuffer = await decryptRSA(encryptedAESKey, keyPair.privateKey);
-    const aesKey = await window.crypto.subtle.importKey(
+    // Decrypt contained AES key using result RSA private key
+    const encryptedResponseAESKey = await secureZip.files['aes-key.enc'].async('uint8array');
+    const responseAESKeyBuffer = await decryptRSA(encryptedResponseAESKey, resultRSAKeyPair.privateKey);
+    const responseAESKey = await window.crypto.subtle.importKey(
         'raw',
-        aesKeyBuffer,
+        responseAESKeyBuffer,
         {
             name: 'AES-GCM',
             length: 256,
@@ -294,10 +466,10 @@ export async function dispatchWorkflow(workflowDispatchAppInstallation, workflow
     );
     
     // Use AES key and iv to decrypt result zip
-    const iv = await secureZip.files['iv.bin'].async('uint8array');
+    const responseIV = await secureZip.files['iv.bin'].async('uint8array');
 
     const resultCiphertext = await secureZip.files['result.zip.enc'].async('uint8array');
-    const resultPlaintext = await decryptAES(resultCiphertext, aesKey, iv);
+    const resultPlaintext = await decryptAES(resultCiphertext, responseAESKey, responseIV);
 
     // Extract contents of result.zip using JSZip and return it
     const zip = await JSZip.loadAsync(resultPlaintext);

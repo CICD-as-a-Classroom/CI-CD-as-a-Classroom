@@ -16,6 +16,9 @@ import threading
 import os
 from base64 import b64encode
 
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+
 from nacl import encoding, public
 from rich.console import Console
 from rich.text import Text
@@ -352,9 +355,10 @@ class HandlerContext:
             'metadata': 'read'
         },
         WORKFLOW_DISPATCH_APP_ENDPOINT: {
-            'actions': 'write',
-            'contents': 'read',
-            'metadata': 'read'
+            'actions': 'write', # TODO remove
+            'issues': 'write',
+            'contents': 'read', # TODO remove
+            'metadata': 'read' # TODO maybe remove?
         },
         STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: {
             'administration': 'write',
@@ -1044,6 +1048,33 @@ def create_repositories(
     return result
 
 
+def gen_classroom_keys() -> tuple[str, str]:
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048
+    )
+    public_key = private_key.public_key()
+
+    # Serialize private key in PKCS8 format (DER / binary encoding, then b64
+    # encode; basically PEM without the delimiters)
+    private_key_der = private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption()
+    )
+    private_key_b64 = b64encode(private_key_der).decode('utf-8')
+
+    # Serialize public key in SPKI format (DER / binary encoding, then b64
+    # encode)
+    public_key_der = public_key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    public_key_b64 = b64encode(public_key_der).decode('utf-8')
+
+    return private_key_b64, public_key_b64
+
+
 def create_repository_variable(
         organization_name: str,
         classroom_setup_token: str,
@@ -1086,7 +1117,8 @@ def create_repository_variable(
 
 def create_repository_variables(
         organization_name: str,
-        handler_context: HandlerContext) -> None:
+        handler_context: HandlerContext,
+        classroom_rsa_public_key: str) -> None:
     all_variables = {
         'backend-workflows': [
             ('STUDENT_ASSIGNMENT_ORGANIZATION', organization_name),
@@ -1130,6 +1162,7 @@ def create_repository_variables(
                 handler_context.app_installation_responses[
                     handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].installation_id),
+            ('CLASSROOM_RSA_PUBLIC_KEY', classroom_rsa_public_key),
         ]
     }
     
@@ -1212,7 +1245,8 @@ def create_repository_secret(
 
 def create_repository_secrets(
         organization_name: str,
-        handler_context: HandlerContext) -> None:
+        handler_context: HandlerContext,
+        classroom_rsa_private_key: str) -> None:
     all_secrets = {
         'backend-workflows': [
             ('AUTH_CLIENT_SECRET',
@@ -1227,6 +1261,7 @@ def create_repository_secrets(
                 handler_context.app_registration_responses[
                     handler_context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
                 ].private_key),
+            ('CLASSROOM_RSA_PRIVATE_KEY', classroom_rsa_private_key),
         ],
         'web': [
             ('WORKFLOW_DISPATCH_APP_PRIVATE_KEY',
@@ -1516,8 +1551,17 @@ def main() -> int:
 
     console.clear()
     
-    create_repository_variables(organization_name, handler_context)
-    create_repository_secrets(organization_name, handler_context)
+    classroom_rsa_private_key, classroom_rsa_public_key = gen_classroom_keys()
+    create_repository_variables(
+        organization_name,
+        handler_context,
+        classroom_rsa_public_key
+    )
+    create_repository_secrets(
+        organization_name,
+        handler_context,
+        classroom_rsa_private_key
+    )
     create_github_pages_site(
         organization_name,
         handler_context.classroom_setup_token

@@ -9,8 +9,6 @@ const common = require('./webpack.common.js');
 const configStr = fs.readFileSync(path.resolve(__dirname, 'config/build.conf'), 'utf8');
 const config = YAML.parse(configStr);
 
-console.log(config);
-
 module.exports = merge(common, {
   mode: 'production',
   module: {

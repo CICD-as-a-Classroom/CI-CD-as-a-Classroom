@@ -19,6 +19,7 @@ jobs:
       BACKEND_REPO: ${{ vars.BACKEND_REPO }}
       WORKFLOW_DISPATCH_APP_ID: ${{ vars.WORKFLOW_DISPATCH_APP_ID }}
       WORKFLOW_DISPATCH_APP_INSTALLATION_ID: ${{ vars.WORKFLOW_DISPATCH_APP_INSTALLATION_ID }}
+      CLASSROOM_RSA_PUBLIC_KEY: ${{ vars.CLASSROOM_RSA_PUBLIC_KEY }}
       WORKFLOW_DISPATCH_APP_PRIVATE_KEY: ${{ secrets.WORKFLOW_DISPATCH_APP_PRIVATE_KEY }}
     steps:
       - name: Checkout
@@ -51,6 +52,7 @@ jobs:
           echo "dispatchRef: 'main'" >> src/config/conf.yaml
           echo "workflowDispatchAppId: '${WORKFLOW_DISPATCH_APP_ID}'" >> src/config/conf.yaml
           echo "workflowDispatchAppInstallationId: ${WORKFLOW_DISPATCH_APP_INSTALLATION_ID}" >> src/config/conf.yaml
+          echo "classroomRSAPublicKey: '${CLASSROOM_RSA_PUBLIC_KEY}'" >> src/config/conf.yaml
           echo "$WORKFLOW_DISPATCH_APP_PRIVATE_KEY" > private-key-pkcs1.pem
 
           # Convert private key from PKCS1 to PKCS8

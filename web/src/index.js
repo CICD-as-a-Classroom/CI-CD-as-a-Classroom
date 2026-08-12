@@ -116,17 +116,17 @@ function updateRefreshAuthTokensWorkflowStatus(statusUpdate) {
     }
 }
 
-async function refreshAuthTokens(workflowDispatchAppInstallation, refreshToken) {
+async function refreshAuthTokens(organizationName, workflowDispatchAppInstallation, refreshToken) {
     resetRefreshAuthTokensProgress();
     
     const workflowInputs = {
         'userRefreshToken': refreshToken,
     }
-    const zip = await util.dispatchWorkflow(workflowDispatchAppInstallation, 'refresh-auth-tokens.yml', workflowInputs, updateRefreshAuthTokensWorkflowStatus, siteConfig.pollDelay);
+    const zip = await util.dispatchWorkflowViaIssue(organizationName, workflowDispatchAppInstallation, 'refresh-auth-tokens', workflowInputs, updateRefreshAuthTokensWorkflowStatus, siteConfig.pollDelay);
     
     if (zip === null) {
         // Workflow failed. Error message should already be displayed via
-        // dispatchWorkflow's statusUpdateCallback functional parameter
+        // statusUpdateCallback functional parameter
         return;
     }
 
@@ -174,7 +174,7 @@ async function refreshAuthTokens(workflowDispatchAppInstallation, refreshToken) 
     };
 }
 
-async function acceptAssignment(workflowDispatchAppInstallation, accessToken, refreshToken, assignmentName, assignmentAcceptKey) {
+async function acceptAssignment(organizationName, workflowDispatchAppInstallation, accessToken, refreshToken, assignmentName, assignmentAcceptKey) {
     let failedAuth = 0;
     let succeeded = false;
     let zip;
@@ -187,11 +187,11 @@ async function acceptAssignment(workflowDispatchAppInstallation, accessToken, re
         if (assignmentAcceptKey !== null) {
             workflowInputs['assignmentAcceptKey'] = assignmentAcceptKey;
         }
-        zip = await util.dispatchWorkflow(workflowDispatchAppInstallation, 'accept-assignment.yml', workflowInputs, updateWorkflowStatus, siteConfig.pollDelay);
+        zip = await util.dispatchWorkflowViaIssue(organizationName, workflowDispatchAppInstallation, 'accept-assignment', workflowInputs, updateWorkflowStatus, siteConfig.pollDelay);
 
         if (zip === null) {
             // Workflow failed. Error message should already be displayed via
-            // dispatchWorkflow's statusUpdateCallback functional parameter
+            // statusUpdateCallback functional parameter
             return {
                 refreshedAccessToken: accessToken,
                 refreshedRefreshToken: refreshToken,
@@ -235,7 +235,7 @@ async function acceptAssignment(workflowDispatchAppInstallation, accessToken, re
         } else if (statusObj.status == 'bad-auth') {
             failedAuth++;
             if (failedAuth < 2) {
-                const refreshResults = await refreshAuthTokens(workflowDispatchAppInstallation, refreshToken);
+                const refreshResults = await refreshAuthTokens(organizationName, workflowDispatchAppInstallation, refreshToken);
                 accessToken = refreshResults.accessToken;
                 refreshToken = refreshResults.refreshToken;
             } else {
@@ -304,6 +304,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const assignmentName = urlParams.get('assignment-name');
     const assignmentAcceptKey = urlParams.get('assignment-accept-key');
 
+    const organizationName = siteConfig.backendRepoOwner;
+
     if (assignmentName == null || assignmentName == "") {
         showError("Missing assignment name in this page's URL");
         return;
@@ -323,7 +325,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (accessToken === null && refreshToken !== null) {
         // Use refresh token to request new access token.
-        const refreshResults = await refreshAuthTokens(workflowDispatchAppInstallation, refreshToken);
+        const refreshResults = await refreshAuthTokens(organizationName, workflowDispatchAppInstallation, refreshToken);
         accessToken = refreshResults.accessToken;
         refreshToken = refreshResults.refreshToken;
     }
@@ -342,6 +344,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Dispatch backend workflow to accept assignment.
     const acceptResults = await acceptAssignment(
+        organizationName,
         workflowDispatchAppInstallation,
         accessToken,
         refreshToken,

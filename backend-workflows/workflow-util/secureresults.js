@@ -24,7 +24,7 @@ async function main() {
 
     // Generate secure results in result/ folder
     const resultDirPath = join(process.cwd(), 'result');
-    secureResults(resultDirPath, fileBuffer, values.file, process.env.RESULT_ENCRYPTION_KEY);
+    await secureResults(resultDirPath, fileBuffer, values.file, process.env.RESULT_ENCRYPTION_KEY);
 }
 
 await main();

@@ -45,6 +45,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pkceCodeVerifier = util.getCookie('pkceCodeVerifier');
     const stateBase64url = util.getCookie('stateBase64url');
 
+    const organizationName = siteConfig.backendRepoOwner;
+
     if (authCode === null) {
         showError('Missing authentication code URL parameter. Authentication failed. Please try again.');
         return;
@@ -77,11 +79,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         'authCode': authCode,
         'pkceCodeVerifier': pkceCodeVerifier
     }
-    const zip = await util.dispatchWorkflow(workflowDispatchAppInstallation, 'gen-user-auth-tokens-github.yml', workflowInputs, updateWorkflowStatus, siteConfig.pollDelay);
+    const zip = await util.dispatchWorkflowViaIssue(organizationName, workflowDispatchAppInstallation, 'gen-user-auth-tokens-github', workflowInputs, updateWorkflowStatus, siteConfig.pollDelay);
 
     if (zip === null) {
         // Workflow failed. Error message should already be displayed via
-        // dispatchWorkflow's statusUpdateCallback functional parameter
+        // statusUpdateCallback functional parameter
         return;
     }
 
