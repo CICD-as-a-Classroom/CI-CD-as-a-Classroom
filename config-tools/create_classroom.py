@@ -28,6 +28,13 @@ from rich.panel import Panel
 import requests
 
 
+# Number of consecutive failures for a given API query before raising an
+# exception
+MAX_API_ATTEMPTS = 3
+# Seconds of waiting before re-attempting API query
+API_REATTEMPT_WAIT_INTERVAL = 10.0
+
+
 console = Console()
 
 
@@ -291,7 +298,16 @@ class HandlerContext:
     def verify_assignment_template_reading_installation(
             repository_selection: str,
             repositories: list[Repository] | None) -> bool:
-        return repository_selection == 'all'
+        if repository_selection != 'selected':
+            return False
+
+        if repositories is None or len(repositories) != 1:
+            return False
+        
+        if repositories[0]['name'] != 'assignment-templates':
+            return False
+
+        return True
 
 
     @staticmethod
@@ -406,17 +422,20 @@ class HandlerContext:
             next_registration_endpoint=\
                 ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
             installation_verifier=\
-                verify_assignment_template_reading_installation
+                verify_student_assignment_writing_installation
         ),
         ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: AppDetails(
-            installation_instructions=(f'Install the assignment template '
-                'reading app in your GitHub '
-                'Organization on ALL repositories.'),
-            installation_configuration_error_message=('The assignment template '
-                'reading app must be installed on ALL (not selected) '
-                'repositories.'),
+            installation_instructions=('Install the assignment template '
+                'reading app in your GitHub Organization '
+                'on the "assignment-templates" repository. CRITICAL: '
+                'Install this app ONLY on the "assignment-templates" '
+                'repository. Do NOT install it on all repositories.'),
+            installation_configuration_error_message=('For security reasons, '
+                'the assignment template reading '
+                'app must be installed on, and ONLY on, the '
+                '"assignment-templates" repository.'),
             installation_verifier=\
-                verify_student_assignment_writing_installation
+                verify_assignment_template_reading_installation
         )
     }
     content_events: dict[str, threading.Event]
@@ -986,46 +1005,59 @@ def create_repository(
         classroom_setup_token: str,
         repository_name: str,
         input_data: RepositoryInputData) -> RepositoryCreationData:
-    headers = {
-        'X-GitHub-Api-Version': '2026-03-10',
-        'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {classroom_setup_token}'
-    }
-    
-    # Check if repo already exists.
-    response = requests.get(
-        f'https://api.github.com/repos/{organization_name}/{repository_name}',
-        headers=headers
-    )
-    if response.status_code == 200:
-        # Repo exists. Return info.
-        response_json = response.json()
-        return RepositoryCreationData(
-            response_json['id'],
-            response_json['html_url']
+    attempt = 0
+    while attempt < MAX_API_ATTEMPTS:
+        attempt += 1
+        headers = {
+            'X-GitHub-Api-Version': '2026-03-10',
+            'Accept': 'application/vnd.github+json',
+            'Authorization': f'Bearer {classroom_setup_token}'
+        }
+        
+        # Check if repo already exists.
+        response = requests.get(
+            f'https://api.github.com/repos/{organization_name}/{repository_name}',
+            headers=headers
+        )
+        if response.status_code == 200:
+            # Repo exists. Return info.
+            response_json = response.json()
+            return RepositoryCreationData(
+                response_json['id'],
+                response_json['html_url']
+            )
+
+        # Repo doesn't exist. Create it.
+        body = {
+            'name': repository_name,
+            'private': input_data.private,
+            'description': input_data.description
+        }
+        response = requests.post(
+            f'https://api.github.com/orgs/{organization_name}/repos',
+            headers=headers,
+            json=body
         )
 
-    # Repo doesn't exist. Create it.
-    body = {
-        'name': repository_name,
-        'private': input_data.private,
-        'description': input_data.description
-    }
-    response = requests.post(
-        f'https://api.github.com/orgs/{organization_name}/repos',
-        headers=headers,
-        json=body
-    )
+        if (response.status_code < 200 or response.status_code >= 300):
+            if attempt < MAX_API_ATTEMPTS:
+                print(f'Failed to create repository {repository_name}; got '
+                    f'HTTP status code {response.status_code}. Trying '
+                    f'again in {API_REATTEMPT_WAIT_INTERVAL} seconds...')
+            else:
+                raise ValueError(f'Failed to create repository '
+                    f'{repository_name}; got '
+                    f'HTTP status code {response.status_code}')
+        else:
+            response_json = response.json()
+            return RepositoryCreationData(
+                response_json['id'],
+                response_json['html_url']
+            )
+        
+        time.sleep(API_REATTEMPT_WAIT_INTERVAL)
 
-    if (response.status_code < 200 or response.status_code >= 300):
-        raise ValueError(f'Failed to create repository {repository_name}; got '
-            f'HTTP status code {response.status_code}')
-
-    response_json = response.json()
-    return RepositoryCreationData(
-        response_json['id'],
-        response_json['html_url']
-    )
+    raise ValueError(f'Failed to create repository {repository_name}.')
 
 
 def create_repositories(
