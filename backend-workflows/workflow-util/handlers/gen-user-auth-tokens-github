@@ -1,0 +1,35 @@
+AUTH_CODE=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.authCode')
+PKCE_CODE_VERIFIER=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.pkceCodeVerifier')
+
+# Mask auth code and code verifier in logs
+echo "::add-mask::$AUTH_CODE"
+echo "::add-mask::$PKCE_CODE_VERIFIER"
+
+# Retrieve auth tokens via cURL request
+auth_status=$(curl -X POST -s -o curl.json -w "%{http_code}" -H "Accept: application/vnd.github+json" "https://github.com/login/oauth/access_token" \
+  --url-query "client_id=$AUTH_CLIENT_ID" \
+  --url-query "client_secret=$AUTH_CLIENT_SECRET" \
+  --url-query "code=$AUTH_CODE" \
+  --url-query "code_verifier=$PKCE_CODE_VERIFIER")
+
+if [[ "$auth_status" != 200 ]]
+then
+    echo -n '{"status": "failure"}' > result/status.json
+    exit 0
+fi
+
+access_token=$(cat curl.json | jq '.access_token')
+refresh_token=$(cat curl.json | jq '.refresh_token')
+access_token_expires_in=$(cat curl.json | jq '.expires_in')
+refresh_token_expires_in=$(cat curl.json | jq '.refresh_token_expires_in')
+
+rm -f curl.json
+
+# Mask tokens in logs
+echo "::add-mask::$access_token"
+echo "::add-mask::$refresh_token"
+
+# Store result
+echo -n '{"accessToken": '"$access_token"', "refreshToken": '"$refresh_token"', "accessTokenExpiresInSeconds": '"$access_token_expires_in"', "refreshTokenExpiresInSeconds": '"$refresh_token_expires_in"'}' > result/data.json
+echo -n '{"status": "success"}' > result/status.json
+exit 0

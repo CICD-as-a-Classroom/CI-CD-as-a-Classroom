@@ -166,6 +166,13 @@ export async function dispatchWorkflowViaIssue(organizationName, workflowDispatc
         pollDelay = 2000;
     }
 
+    if (!workflowInputs) {
+        workflowInputs = {};
+    }
+
+    // Embed workflowEventName in workflowInputs['eventName']
+    workflowInputs['eventName'] = workflowEventName
+
     // Generate RSA key pair. The backend will use the public key to encrypt
     // workflow results. This function will then use the private key to
     // decrypt them.
@@ -174,15 +181,12 @@ export async function dispatchWorkflowViaIssue(organizationName, workflowDispatc
     // Export public key to SPKI format, then convert to Base64 and embed in
     // workflow inputs
     const exportedResponsePublicKey = await window.crypto.subtle.exportKey("spki", resultRSAKeyPair.publicKey);
-    const resultEncryptionKeyBase64url =
+    const resultEncryptionKeyBase64 =
         new Uint8Array(exportedResponsePublicKey)
-        .toBase64({ alphabet: 'base64url', omitPadding: true });
-    
-    if (!workflowInputs) {
-        workflowInputs = {};
-    }
-    workflowInputs['resultEncryptionKey'] = resultEncryptionKeyBase64url;
+        .toBase64({ omitPadding: true });
 
+    workflowInputs['resultEncryptionKey'] = resultEncryptionKeyBase64;
+    
     // Embed random verifier string in workflow inputs for preventing replay
     // attacks / backend-workflow spoofing (perhaps a bit redundant since
     // resultEncryptionKey is generated per-request)
@@ -221,7 +225,7 @@ export async function dispatchWorkflowViaIssue(organizationName, workflowDispatc
         postIssueResponse = await workflowDispatchAppInstallation.request(`POST /repos/${organizationName}/backend-workflows/issues`, {
             owner: organizationName,
             repo: 'backend-workflows',
-            title: `[${workflowEventName}]`,
+            title: `[securely-dispatch-workflow]`,
             body: issueBodyBase64,
             headers: {
                 'X-GitHub-Api-Version': '2026-03-10'
