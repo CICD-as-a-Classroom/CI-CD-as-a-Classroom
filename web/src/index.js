@@ -127,25 +127,39 @@ async function refreshAuthTokens(organizationName, workflowDispatchAppInstallati
     if (zip === null) {
         // Workflow failed. Error message should already be displayed via
         // statusUpdateCallback functional parameter
-        return;
+        return {
+            accessToken: null,
+            refreshToken: null,
+            status: 'error'
+        };
     }
 
-    // Store new access and refresh token in cookies
     if (!Object.hasOwn(zip.files, 'result/status.json')) {
         showError("Artifact result archive missing status.json");
-        return;
+        return {
+            accessToken: null,
+            refreshToken: null,
+            status: 'error'
+        };
     }
 
     const statusJson = await zip.files['result/status.json'].async('string');
     const statusObj = JSON.parse(statusJson);
     if (statusObj.status != 'success') {
-        showError(`Artifact result archive reported non-success status "${statusObj.status}"`);
-        return;
+        return {
+            accessToken: null,
+            refreshToken: null,
+            status: 'bad-auth'
+        };
     }
 
     if (!Object.hasOwn(zip.files, 'result/data.json')) {
         showError("Artifact result archive missing data.json");
-        return;
+        return {
+            accessToken: null,
+            refreshToken: null,
+            status: 'error'
+        };
     }
 
     const responseDataJson = await zip.files['result/data.json'].async('string');
@@ -170,8 +184,40 @@ async function refreshAuthTokens(organizationName, workflowDispatchAppInstallati
 
     return {
         accessToken: responseData.accessToken,
-        refreshToken: responseData.refreshToken
+        refreshToken: responseData.refreshToken,
+        status: 'success'
     };
+}
+
+async function authenticate() {
+    const redirectingContentContainer = document.getElementById('redirecting-content-container');
+    const loadingContentContainer = document.getElementById('loading-content-container');
+    const refreshAuthTokensContentContainer = document.getElementById('refresh-auth-tokens-content-container');
+    redirectingContentContainer.style.display = 'block';
+    loadingContentContainer.style.display = 'none';
+    refreshAuthTokensContentContainer.style.display = 'none';
+
+    const authClientId = siteConfig.authClientId;
+
+    const pkceCodeVerifier = util.generateSecureString(128);
+    const pkceCodeChallenge =
+        (await util.sha256(pkceCodeVerifier))
+        .toBase64({ alphabet: 'base64url', omitPadding: true });
+    
+    util.setCookie('pkceCodeVerifier', pkceCodeVerifier, '/', 3600);
+
+    const randomStateToken = util.generateSecureString(32);
+    const state = {
+        randomToken: randomStateToken,
+        originatingUrl: window.location.href
+    };
+    const stateBase64url =
+        new TextEncoder().encode(JSON.stringify(state))
+        .toBase64({ alphabet: 'base64url', omitPadding: true });
+    
+    util.setCookie('stateBase64url', stateBase64url, '/', 3600);
+    
+    window.location.replace(`https://github.com/login/oauth/authorize?client_id=${authClientId}&state=${stateBase64url}&code_challenge=${pkceCodeChallenge}&code_challenge_method=S256`)
 }
 
 async function acceptAssignment(organizationName, workflowDispatchAppInstallation, accessToken, refreshToken, assignmentName, assignmentAcceptKey) {
@@ -236,8 +282,22 @@ async function acceptAssignment(organizationName, workflowDispatchAppInstallatio
             failedAuth++;
             if (failedAuth < 2) {
                 const refreshResults = await refreshAuthTokens(organizationName, workflowDispatchAppInstallation, refreshToken);
-                accessToken = refreshResults.accessToken;
-                refreshToken = refreshResults.refreshToken;
+                if (refreshResults.status == 'success') {
+                    accessToken = refreshResults.accessToken;
+                    refreshToken = refreshResults.refreshToken;
+                } else if (refreshResults.status == 'bad-auth') {
+                    // Refresh token is bad. Redirect to main auth flow page.
+                    await authenticate();
+                } else {
+                    // Refresh failed for unexpected reason. Error message
+                    // should already be displayed. Halt.
+                    return {
+                        refreshedAccessToken: accessToken,
+                        refreshedRefreshToken: refreshToken,
+                        succeeded: false,
+                        zip: null
+                    };
+                }
             } else {
                 showError(`Failed to authenticate user with GitHub`);
                 return {
@@ -268,37 +328,6 @@ async function acceptAssignment(organizationName, workflowDispatchAppInstallatio
     };
 }
 
-async function authenticate() {
-    const redirectingContentContainer = document.getElementById('redirecting-content-container');
-    const loadingContentContainer = document.getElementById('loading-content-container');
-    const refreshAuthTokensContentContainer = document.getElementById('refresh-auth-tokens-content-container');
-    redirectingContentContainer.style.display = 'block';
-    loadingContentContainer.style.display = 'none';
-    refreshAuthTokensContentContainer.style.display = 'none';
-
-    const authClientId = siteConfig.authClientId;
-
-    const pkceCodeVerifier = util.generateSecureString(128);
-    const pkceCodeChallenge =
-        (await util.sha256(pkceCodeVerifier))
-        .toBase64({ alphabet: 'base64url', omitPadding: true });
-    
-    util.setCookie('pkceCodeVerifier', pkceCodeVerifier, '/', 3600);
-
-    const randomStateToken = util.generateSecureString(32);
-    const state = {
-        randomToken: randomStateToken,
-        originatingUrl: window.location.href
-    };
-    const stateBase64url =
-        new TextEncoder().encode(JSON.stringify(state))
-        .toBase64({ alphabet: 'base64url', omitPadding: true });
-    
-    util.setCookie('stateBase64url', stateBase64url, '/', 3600);
-    
-    window.location.replace(`https://github.com/login/oauth/authorize?client_id=${authClientId}&state=${stateBase64url}&code_challenge=${pkceCodeChallenge}&code_challenge_method=S256`)
-}
-
 document.addEventListener('DOMContentLoaded', async () => {
     const urlParams = new URLSearchParams(window.location.search);
     const assignmentName = urlParams.get('assignment-name');
@@ -326,11 +355,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (accessToken === null && refreshToken !== null) {
         // Use refresh token to request new access token.
         const refreshResults = await refreshAuthTokens(organizationName, workflowDispatchAppInstallation, refreshToken);
-        accessToken = refreshResults.accessToken;
-        refreshToken = refreshResults.refreshToken;
+        if (refreshResults.status == 'success') {
+            accessToken = refreshResults.accessToken;
+            refreshToken = refreshResults.refreshToken;
+        } else if (refreshResults.status == 'bad-auth') {
+            // Refresh token is bad. Set both tokens to null so that user
+            // is redirected to main auth flow.
+            accessToken = null;
+            refreshToken = null;
+        } else {
+            // Refresh failed for unexpected reason. Error message
+            // should already be displayed. Halt.
+            return;
+        }
     }
 
-    // Main auth flow
+    // Main auth flow if either token is null
     if (refreshToken === null || accessToken === null) {
         // Redirect browser to GitHub App login.
         await authenticate();
