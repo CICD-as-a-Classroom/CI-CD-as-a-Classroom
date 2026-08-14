@@ -9,3 +9,4 @@ Below is a list of some more extensive features that are planned to be implement
 
 - [GitLab support](../../issues/3)
 - [Better support for restricted institutional hardware](../../issues/4)
+- [Admin console web UI](../../issues/14)
