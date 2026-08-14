@@ -8,6 +8,7 @@ Git Classroom is a very new platform. It's still missing many features and needs
 Below is a list of some more extensive features that are planned to be implemented at a later time:
 
 - [Better support for restricted institutional hardware](../../issues/4)
+- [Multiple classrooms per organization](../../issues/16)
 - [Autograding](../../issues/15)
 - [GitLab support](../../issues/3)
 - [Admin console web UI](../../issues/14)
