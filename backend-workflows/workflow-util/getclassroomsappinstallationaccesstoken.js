@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 
-import { getAssignmentTemplateReadingAppInstallationAccessToken as getInstallationAccessToken } from './util.js'
+import { getClassroomsAppInstallationAccessToken as getInstallationAccessToken } from './util.js'
 
 async function main() {
     const installationAccessToken = await getInstallationAccessToken();

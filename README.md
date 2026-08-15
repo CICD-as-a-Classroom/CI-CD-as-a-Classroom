@@ -18,22 +18,22 @@ To set up a new classroom:
    You'll be asked to create a GitHub Organization for your classroom. You'll then be asked to navigate to a webpage hosted locally by the classroom setup tool that will guide you through registering and installing four GitHub Apps in your organization. These operations cannot be fully automated via the GitHub API, hence why they require your manual intervention in a browser.
 
 Once the classroom setup script has finished, your organization should be populated with three repositories:
-- `assignment-templates`: This is where you'll create assignment templates (e.g., starter code and instructions documents) that will be instantiated to create students' assignment repositories. `assignment-templates` is a private repository; students cannot view it by default. See [here](#Creating an assignment) for more information on creating assignments.
+- `classrooms`: This is where you'll configure your classroom and assignments, including assignment templates (e.g., starter code and instructions documents) that will be instantiated to create students' assignment repositories. `classrooms` is a private repository; students cannot view it. See [here](#Creating an assignment) for more information on creating assignments.
 - `web`: This repository hosts the classroom's frontend web UI via GitHub Pages through which students can accept assignments. You generally shouldn't need to concern yourself with it. It's a public repository (in free GitHub organizations, GitHub Pages can only be used to host sites out of public repositories).
 - `backend-workflows`. This repository hosts GitHub Actions workflows that serve as an event-driven backend to authenticate students, accept assignments, and so on. It's a private repository, and you generally shouldn't need to concern yourself with it.
 
 ## Creating assignments
 
-Assignments are created by pushing chnages to the `assignment-templates` repository. To create an assignment, do one or both of the following:
+Assignments are created by manually editing the contents of the `assignments/` directory within the `classrooms` repository. To create an assignment, do one or both of the following:
 
-- Create a template directory for the assignment and populate it with the assignment's template contents (`README.md`, starter code, etc). Note: assignment directory names should consist only of alphanumeric characters (`a-z`, `A-Z`, `0-9`), hyphens (`-`), underscores (`_`), and / or periods (`.`).
+- Create a template subdirectory for the assignment and populate it with the assignment's template contents (`README.md`, starter code, etc). Note: assignment directory names should consist only of alphanumeric characters (`a-z`, `A-Z`, `0-9`), hyphens (`-`), underscores (`_`), and / or periods (`.`).
 - In `assignments.conf`, create a new manifest entry for the assignment. `assignments.conf` is a [YAML](https://yaml.org/) file consisting of a list of assignment objects. Each assignment object may have the following fields:\
   1. (Required) `name`: The assignment's name. If the assignment has a template directory (as explained in the previous bullet point), this field's value must **exactly** match the name of the assignment's template directory (case-sensitive match).
   2. (Optional) `key`: The secret string of characters required to accept the assignment. Think of it as a password. To generate a link through which students can accept the assignment, the assignment's accept key must be embedded in the link as a query parameter (see below). If this field is omitted, then the assignment will have no accept key, and it can be accepted by anyone who knows (or can guess) the assignment's name.
 
 An assignment with a template directory but no entry in `assignments.conf` will take on a default configuration (i.e., it will have no assignment accept key). An assignment with an entry in `assignments.conf` but no template directory will have no starter contents---when students accept the assignment, their repository will be empty with no commits.
 
-When your classroom is first created, the `assignment-templates` repository ships with some example assignment configurations.
+When your classroom is first created, the `classrooms` repository ships with some example assignment configurations.
 
 ## Accepting an assignment
 
@@ -41,7 +41,7 @@ Once an assignment is created, a student can accept it by navigating to a link m
 
 `https://<ORGANIZATION NAME>.github.io/web?assignment-name=<ASSIGNMENT NAME>&assignment-accept-key=<ASSIGNMENT ACCEPT KEY>`
 
-The instructor must create these links and share them with their students. Replace `<ORGANIZATION NAME>` with the name of the classroom's GitHub Organization, replace `<ASSIGNMENT NAME>` with the (case-sensitive) name of the assignment as configured in the `assignment-templates` repository, and replace `<ASSIGNMENT ACCEPT KEY>` with the assignment's accept key as configured in the `assignment-templates` repository. If the assignment has no accept key, then the `&assignment-accept-key=<ASSIGNMENT ACCEPT KEY>` part of the link can be omitted.
+The instructor must create these links and share them with their students. Replace `<ORGANIZATION NAME>` with the name of the classroom's GitHub Organization, replace `<ASSIGNMENT NAME>` with the (case-sensitive) name of the assignment as configured in the `classrooms` repository, and replace `<ASSIGNMENT ACCEPT KEY>` with the assignment's accept key as configured in the `classrooms` repository. If the assignment has no accept key, then the `&assignment-accept-key=<ASSIGNMENT ACCEPT KEY>` part of the link can be omitted.
 
 For example: 
 

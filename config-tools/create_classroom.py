@@ -272,14 +272,14 @@ class AppDetails:
 
 class HandlerContext:
     @staticmethod
-    def verify_classroom_setup_installation(
+    def verify_classroom_setup_app_installation(
             repository_selection: str,
             repositories: list[Repository] | None) -> bool:
         return repository_selection == 'all'
 
 
     @staticmethod
-    def verify_workflow_dispatch_installation(
+    def verify_backend_workflow_dispatch_app_installation(
             repository_selection: str,
             repositories: list[Repository] | None) -> bool:
         if repository_selection != 'selected':
@@ -295,7 +295,7 @@ class HandlerContext:
         
 
     @staticmethod
-    def verify_assignment_template_reading_installation(
+    def verify_classrooms_app_installation(
             repository_selection: str,
             repositories: list[Repository] | None) -> bool:
         if repository_selection != 'selected':
@@ -304,14 +304,14 @@ class HandlerContext:
         if repositories is None or len(repositories) != 1:
             return False
         
-        if repositories[0]['name'] != 'assignment-templates':
+        if repositories[0]['name'] != 'classrooms':
             return False
 
         return True
 
 
     @staticmethod
-    def verify_student_assignment_writing_installation(
+    def verify_assignment_creation_app_installation(
             repository_selection: str,
             repositories: list[Repository] | None) -> bool:
         return repository_selection == 'all'
@@ -323,25 +323,25 @@ class HandlerContext:
         'classroom-setup-app'
     WORKFLOW_DISPATCH_APP_ENDPOINT = \
         'workflow-dispatch-app'
-    ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT = \
-        'assignment-template-reading-app'
-    STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT = \
-        'student-assignment-writing-app'
+    CLASSROOMS_APP_ENDPOINT = \
+        'classrooms-app'
+    ASSIGNMENT_CREATION_APP_ENDPOINT = \
+        'assignment-creation-app'
     APP_MANIFEST_ENDPOINTS = [
         CLASSROOM_SETUP_APP_ENDPOINT,
         WORKFLOW_DISPATCH_APP_ENDPOINT,
-        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
-        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT,
+        CLASSROOMS_APP_ENDPOINT,
+        ASSIGNMENT_CREATION_APP_ENDPOINT,
     ]
     APP_NAMES = {
         CLASSROOM_SETUP_APP_ENDPOINT: \
             'Classroom Setup',
         WORKFLOW_DISPATCH_APP_ENDPOINT: \
-            'Backend Workflow Dispatch',
-        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: \
-            'Assignment Template Reading',
-        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: \
-            'Student Assignment Writing'
+            'Workflow Dispatch',
+        CLASSROOMS_APP_ENDPOINT: \
+            'Classrooms',
+        ASSIGNMENT_CREATION_APP_ENDPOINT: \
+            'Assignment Creation'
     }
     APP_DESCRIPTIONS = {
         CLASSROOM_SETUP_APP_ENDPOINT: ('Temporary app used to '
@@ -352,11 +352,11 @@ class HandlerContext:
             'classroom\'s student-facing web frontend. Used to dispatch '
             'backend workflows (e.g., to authenticate students and accept '
             'assignments).'),
-        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: ('App used to '
+        ASSIGNMENT_CREATION_APP_ENDPOINT: ('App used to '
             'generate, populate, and generate invites for student '
             'assignment repositories.'),
-        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: ('App used to '
-            'read assignment template repository contents for configuring '
+        CLASSROOMS_APP_ENDPOINT: ('App used to '
+            'read classrooms repository contents for configuring '
             'and initializing student assignment repositories upon assignment '
             'acceptance.')
     }
@@ -374,68 +374,68 @@ class HandlerContext:
             'actions': 'read',
             'issues': 'write'
         },
-        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: {
+        ASSIGNMENT_CREATION_APP_ENDPOINT: {
             'administration': 'write',
             'contents': 'write',
             'metadata': 'read'
         },
-        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: {
+        CLASSROOMS_APP_ENDPOINT: {
             'contents': 'read',
             'metadata': 'read'
         }
     }
     APP_DETAILS = {
         CLASSROOM_SETUP_APP_ENDPOINT: AppDetails(
-            installation_instructions=('Install the classroom setup app '
+            installation_instructions=('Install the Classroom Setup app '
                 'in your GitHub Organization '
                 'on ALL repositories. Note: The setup script will uninstall '
                 'this app once the setup is complete.'),
-            installation_configuration_error_message=('The classroom setup '
+            installation_configuration_error_message=('The Classroom Setup '
                 'app must be installed on ALL (not selected) repositories.'),
             next_registration_endpoint=\
                 WORKFLOW_DISPATCH_APP_ENDPOINT,
             installation_verifier=\
-                verify_classroom_setup_installation
+                verify_classroom_setup_app_installation
         ),
         WORKFLOW_DISPATCH_APP_ENDPOINT: AppDetails(
-            installation_instructions=('Install the workflow dispatch app '
-                'in your GitHub Organization '
+            installation_instructions=('Install the Workflow Dispatch '
+                'app in your GitHub Organization '
                 'on the "backend-workflows" repository. CRITICAL: '
                 'Install this app ONLY on the "backend-workflows" '
                 'repository. Do NOT install it on all repositories.'),
             installation_configuration_error_message=('For security reasons, '
-                'the workflow dispatch '
+                'the Workflow Dispatch '
                 'app must be installed on, and ONLY on, the '
                 '"backend-workflows" repository.'),
             next_registration_endpoint=\
-                STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT,
+                ASSIGNMENT_CREATION_APP_ENDPOINT,
             installation_verifier=\
-                verify_workflow_dispatch_installation
+                verify_backend_workflow_dispatch_app_installation
         ),
-        STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT: AppDetails(
-            installation_instructions=(f'Install the student assignment '
-                'writing app in your GitHub '
+        ASSIGNMENT_CREATION_APP_ENDPOINT: AppDetails(
+            installation_instructions=(f'Install the Assignment Creation '
+                'app in your GitHub '
                 'Organization on ALL repositories.'),
-            installation_configuration_error_message=('The student assignment '
-                'writing app must be installed on ALL (not selected) '
+            installation_configuration_error_message=('The Assignment Creation '
+                'app must be installed on ALL (not selected) '
                 'repositories.'),
             next_registration_endpoint=\
-                ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT,
+                CLASSROOMS_APP_ENDPOINT,
             installation_verifier=\
-                verify_student_assignment_writing_installation
+                verify_assignment_creation_app_installation
         ),
-        ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT: AppDetails(
-            installation_instructions=('Install the assignment template '
-                'reading app in your GitHub Organization '
-                'on the "assignment-templates" repository. CRITICAL: '
-                'Install this app ONLY on the "assignment-templates" '
+        CLASSROOMS_APP_ENDPOINT: AppDetails(
+            installation_instructions=('Install the Classrooms '
+                'app in your GitHub Organization '
+                'on the "classrooms" repository. CRITICAL: '
+                'Install this app ONLY on the "classrooms" '
                 'repository. Do NOT install it on all repositories.'),
             installation_configuration_error_message=('For security reasons, '
-                'the assignment template reading '
+                'the Classrooms '
                 'app must be installed on, and ONLY on, the '
-                '"assignment-templates" repository.'),
+                '"classrooms" repository.'),
             installation_verifier=\
-                verify_assignment_template_reading_installation
+                verify_classrooms_app_installation
         )
     }
     content_events: dict[str, threading.Event]
@@ -473,13 +473,22 @@ def secure_random_url_string(length: int) -> str:
     random_chars = [URL_CHARS[byte % len(URL_CHARS)] for byte in random_bytes]
     return ''.join(random_chars)
 
+APP_NAME_CHARS="ABC1234567890"
+def random_app_name_suffix(length: int) -> str:
+    random_bytes = os.urandom(length)
+    random_chars = [APP_NAME_CHARS[byte % len(APP_NAME_CHARS)] for byte in random_bytes]
+    return ''.join(random_chars)
+
+
+MAX_APP_NAME_LENGTH = 34
+
 
 def get_handler_class(context: HandlerContext) -> type:
     class Handler(BaseHTTPRequestHandler):
         def register_app(self, registration_endpoint: str) -> None:
-            app_name = context.APP_NAMES[
-                registration_endpoint
-            ]
+            app_name = context.APP_NAMES[registration_endpoint]
+            app_name_suffix = \
+                random_app_name_suffix(MAX_APP_NAME_LENGTH - len(app_name) - 1)
             app_default_permissions = \
                 json.dumps(context.APP_PERMISSIONS[registration_endpoint])
             state_string = secure_random_url_string(32)
@@ -494,7 +503,7 @@ window.addEventListener('DOMContentLoaded', () => {{
   form = document.getElementById("manifest-form")
   input = document.getElementById("manifest")
   input.value = JSON.stringify({{
-    "name": "{app_name}",
+    "name": "{app_name} {app_name_suffix}",
     "url": "https://github.com/{context.organization_name}",
     "redirect_url": "http://localhost:{context.server_port}/{registration_endpoint}/install",
     "callback_urls": [
@@ -521,29 +530,26 @@ window.addEventListener('DOMContentLoaded', () => {{
             )
 
 
-        def register_workflow_dispatch_app(self) -> None:
+        def register_backend_workflow_dispatch_app(self) -> None:
             context.repositories_created_event.wait()
             self.register_app(
                 context.WORKFLOW_DISPATCH_APP_ENDPOINT
             )
 
 
-        def register_student_assignment_writing_app(self) -> None:
+        def register_assignment_creation_app(self) -> None:
             self.register_app(
-                context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                context.ASSIGNMENT_CREATION_APP_ENDPOINT
             )
 
 
-        def register_assignment_template_reading_app(self) -> None:
+        def register_classrooms_app(self) -> None:
             self.register_app(
-                context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                context.CLASSROOMS_APP_ENDPOINT
             )
 
 
         def install_app(self, registration_endpoint: str) -> None:
-            app_name = context.APP_NAMES[
-                registration_endpoint
-            ]
             path_params = self.path.split('?')[1].split('&')
             path_params_tuple_list = [
                 tuple(param.split('=')) for param in path_params
@@ -613,21 +619,21 @@ window.addEventListener('DOMContentLoaded', () => {{
             )
 
 
-        def install_workflow_dispatch_app(self) -> None:
+        def install_backend_workflow_dispatch_app(self) -> None:
             self.install_app(
                 context.WORKFLOW_DISPATCH_APP_ENDPOINT
             )
 
 
-        def install_student_assignment_writing_app(self) -> None:
+        def install_assignment_creation_app(self) -> None:
             self.install_app(
-                context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                context.ASSIGNMENT_CREATION_APP_ENDPOINT
             )
 
 
-        def install_assignment_template_reading_app(self) -> None:
+        def install_classrooms_app(self) -> None:
             self.install_app(
-                context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                context.CLASSROOMS_APP_ENDPOINT
             )
 
         
@@ -680,9 +686,6 @@ window.addEventListener('DOMContentLoaded', () => {{
         def setup_app(
                 self,
                 registration_endpoint: str) -> None:
-            app_name = context.APP_NAMES[
-                registration_endpoint
-            ]
             path_params = self.path.split('?')[1].split('&')
             path_params_tuple_list = [
                 tuple(param.split('=')) for param in path_params
@@ -756,21 +759,21 @@ window.addEventListener('DOMContentLoaded', () => {{
             )
 
 
-        def setup_workflow_dispatch_app(self) -> None:
+        def setup_backend_workflow_dispatch_app(self) -> None:
             self.setup_app(
                 context.WORKFLOW_DISPATCH_APP_ENDPOINT
             )
 
 
-        def setup_student_assignment_writing_app(self) -> None:
+        def setup_assignment_creation_app(self) -> None:
             self.setup_app(
-                context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                context.ASSIGNMENT_CREATION_APP_ENDPOINT
             )
 
 
-        def setup_assignment_template_reading_app(self) -> None:
+        def setup_classrooms_app(self) -> None:
             self.setup_app(
-                context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                context.CLASSROOMS_APP_ENDPOINT
             )
             
 
@@ -782,23 +785,23 @@ window.addEventListener('DOMContentLoaded', () => {{
             f'/{context.CLASSROOM_SETUP_APP_ENDPOINT}/setup': \
                 setup_classroom_setup_app,
             f'/{context.WORKFLOW_DISPATCH_APP_ENDPOINT}': \
-                register_workflow_dispatch_app,
+                register_backend_workflow_dispatch_app,
             f'/{context.WORKFLOW_DISPATCH_APP_ENDPOINT}/install': \
-                install_workflow_dispatch_app,
+                install_backend_workflow_dispatch_app,
             f'/{context.WORKFLOW_DISPATCH_APP_ENDPOINT}/setup': \
-                setup_workflow_dispatch_app,
-            f'/{context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}': \
-                register_student_assignment_writing_app,
-            f'/{context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}/install': \
-                install_student_assignment_writing_app,
-            f'/{context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT}/setup': \
-                setup_student_assignment_writing_app,
-            f'/{context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}': \
-                register_assignment_template_reading_app,
-            f'/{context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}/install': \
-                install_assignment_template_reading_app,
-            f'/{context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT}/setup': \
-                setup_assignment_template_reading_app,
+                setup_backend_workflow_dispatch_app,
+            f'/{context.ASSIGNMENT_CREATION_APP_ENDPOINT}': \
+                register_assignment_creation_app,
+            f'/{context.ASSIGNMENT_CREATION_APP_ENDPOINT}/install': \
+                install_assignment_creation_app,
+            f'/{context.ASSIGNMENT_CREATION_APP_ENDPOINT}/setup': \
+                setup_assignment_creation_app,
+            f'/{context.CLASSROOMS_APP_ENDPOINT}': \
+                register_classrooms_app,
+            f'/{context.CLASSROOMS_APP_ENDPOINT}/install': \
+                install_classrooms_app,
+            f'/{context.CLASSROOMS_APP_ENDPOINT}/setup': \
+                setup_classrooms_app,
         }
 
 
@@ -904,8 +907,8 @@ BROWSER_FLOW_MESSAGE_1 = (
     'up)\n'
     '- dispatching backend workflows from the web frontend to '
     'authenticate students and allow them to accept assignments\n'
-    '- reading assignment template code and configurations\n'
-    '- writing and administering student assignment repositories\n\n'
+    '- reading configurations and assignment templates\n'
+    '- creating and administering student assignment repositories\n\n'
     'These apps will be registered from respective preconfigured manifests, '
     'but the registration requires your approval via GitHub\'s web '
     'UI.\n\n'
@@ -989,7 +992,7 @@ ALL_REPOSITORY_INPUT_DATA = {
             'accept assignments, etc'),
         private=False
     ),
-    'assignment-templates': RepositoryInputData(
+    'classrooms': RepositoryInputData(
         description=('This repository contains '
             'assignment configuration files as well as assignment templates '
             '(starter code) '
@@ -1152,23 +1155,23 @@ def create_repository_variables(
     all_variables = {
         'backend-workflows': [
             ('STUDENT_ASSIGNMENT_ORGANIZATION', organization_name),
-            ('ASSIGNMENT_TEMPLATE_REPO',
-                f'github.com/{organization_name}/assignment-templates.git'),
-            ('STUDENT_ASSIGNMENT_WRITING_APP_ID',
+            ('CLASSROOMS_REPO',
+                f'github.com/{organization_name}/classrooms.git'),
+            ('ASSIGNMENT_CREATION_APP_ID',
                 handler_context.app_registration_responses[
-                    handler_context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                    handler_context.ASSIGNMENT_CREATION_APP_ENDPOINT
                 ].client_id),
-            ('STUDENT_ASSIGNMENT_WRITING_APP_INSTALLATION_ID',
+            ('ASSIGNMENT_CREATION_APP_INSTALLATION_ID',
                 handler_context.app_installation_responses[
-                    handler_context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                    handler_context.ASSIGNMENT_CREATION_APP_ENDPOINT
                 ].installation_id),
-            ('ASSIGNMENT_TEMPLATE_READING_APP_ID',
+            ('CLASSROOMS_APP_ID',
                 handler_context.app_registration_responses[
-                    handler_context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                    handler_context.CLASSROOMS_APP_ENDPOINT
                 ].client_id),
-            ('ASSIGNMENT_TEMPLATE_READING_APP_INSTALLATION_ID',
+            ('CLASSROOMS_APP_INSTALLATION_ID',
                 handler_context.app_installation_responses[
-                    handler_context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                    handler_context.CLASSROOMS_APP_ENDPOINT
                 ].installation_id),
             ('AUTH_CLIENT_ID',
                 handler_context.app_registration_responses[
@@ -1283,13 +1286,13 @@ def create_repository_secrets(
                 handler_context.app_registration_responses[
                     handler_context.WORKFLOW_DISPATCH_APP_ENDPOINT
                 ].client_secret),
-            ('STUDENT_ASSIGNMENT_WRITING_APP_PRIVATE_KEY',
+            ('ASSIGNMENT_CREATION_APP_PRIVATE_KEY',
                 handler_context.app_registration_responses[
-                    handler_context.STUDENT_ASSIGNMENT_WRITING_APP_ENDPOINT
+                    handler_context.ASSIGNMENT_CREATION_APP_ENDPOINT
                 ].private_key),
-            ('ASSIGNMENT_TEMPLATE_READING_APP_PRIVATE_KEY',
+            ('CLASSROOMS_APP_PRIVATE_KEY',
                 handler_context.app_registration_responses[
-                    handler_context.ASSIGNMENT_TEMPLATE_READING_APP_ENDPOINT
+                    handler_context.CLASSROOMS_APP_ENDPOINT
                 ].private_key),
             ('CLASSROOM_RSA_PRIVATE_KEY', classroom_rsa_private_key),
         ],
@@ -1522,23 +1525,11 @@ def uninstall_app(
 def exit_notes(organization_name: str) -> None:
     rprint_wrapped('Configuration complete.')
     rprint(f'- You can now create assignments in your classroom '
-        f'organization\'s "assignment-templates" repository:')
+        f'organization\'s "classrooms" repository:')
     rprint()
-    rprint(f'https://github.com/{organization_name}/assignment-templates')
+    rprint(f'https://github.com/{organization_name}/classrooms')
     rprint()
-    rprint_wrapped(f'- Students can accept assignments by navigating to')
-    rprint()
-    rprint(f'https://{organization_name}.github.io/web?'
-        'assignment-name=ASSIGNMENT_NAME&'
-        'assignment-accept-key=ASSIGNMENT_ACCEPT_KEY')
-    rprint()
-    rprint(f'where ASSIGNMENT_NAME is the name of the '
-        f'assignment\'s directory '
-        f'in the "assignment-templates" repository, and '
-        f'ASSIGNMENT_ACCEPT_KEY is the assignment\'s accept key as '
-        f'configured in the "assignment-templates" repository. See your '
-        f'"assignment-templates" repository\'s README.md file for more '
-        f'information.')
+    rprint_wrapped(f'See README.md for more information')
 
 
 def main() -> int:

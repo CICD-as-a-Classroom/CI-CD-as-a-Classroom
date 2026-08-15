@@ -5,40 +5,40 @@ import { join } from 'node:path';
 import { App } from 'octokit';
 import { createAppAuth } from '@octokit/auth-app';
 
-export async function getStudentAssignmentWritingAppInstallation() {
-    const studentAssignmentWritingApp = new App({
-        appId: process.env.STUDENT_ASSIGNMENT_WRITING_APP_ID,
-        privateKey: process.env.STUDENT_ASSIGNMENT_WRITING_APP_PRIVATE_KEY,
+export async function getAssignmentCreationAppInstallation() {
+    const assignmentCreationApp = new App({
+        appId: process.env.ASSIGNMENT_CREATION_APP_ID,
+        privateKey: process.env.ASSIGNMENT_CREATION_APP_PRIVATE_KEY,
     });
 
-    return await studentAssignmentWritingApp.getInstallationOctokit(Number(process.env.STUDENT_ASSIGNMENT_WRITING_APP_INSTALLATION_ID));
+    return await assignmentCreationApp.getInstallationOctokit(Number(process.env.ASSIGNMENT_CREATION_APP_INSTALLATION_ID));
 }
 
-export async function getStudentAssignmentWritingAppInstallationAccessToken() {
+export async function getAssignmentCreationAppInstallationAccessToken() {
     const auth = createAppAuth({
-      appId: process.env.STUDENT_ASSIGNMENT_WRITING_APP_ID,
-      privateKey: process.env.STUDENT_ASSIGNMENT_WRITING_APP_PRIVATE_KEY,
+      appId: process.env.ASSIGNMENT_CREATION_APP_ID,
+      privateKey: process.env.ASSIGNMENT_CREATION_APP_PRIVATE_KEY,
     });
 
     // Retrieve the raw installation access token
     const installationAuth = await auth({
       type: "installation",
-      installationId: Number(process.env.STUDENT_ASSIGNMENT_WRITING_APP_INSTALLATION_ID),
+      installationId: Number(process.env.ASSIGNMENT_CREATION_APP_INSTALLATION_ID),
     });
 
     return installationAuth.token;
 }
 
-export async function getAssignmentTemplateReadingAppInstallationAccessToken() {
+export async function getClassroomsAppInstallationAccessToken() {
     const auth = createAppAuth({
-      appId: process.env.ASSIGNMENT_TEMPLATE_READING_APP_ID,
-      privateKey: process.env.ASSIGNMENT_TEMPLATE_READING_APP_PRIVATE_KEY,
+      appId: process.env.CLASSROOMS_APP_ID,
+      privateKey: process.env.CLASSROOMS_APP_PRIVATE_KEY,
     });
 
     // Retrieve the raw installation access token
     const installationAuth = await auth({
       type: "installation",
-      installationId: Number(process.env.ASSIGNMENT_TEMPLATE_READING_APP_INSTALLATION_ID),
+      installationId: Number(process.env.CLASSROOMS_APP_INSTALLATION_ID),
     });
 
     return installationAuth.token;

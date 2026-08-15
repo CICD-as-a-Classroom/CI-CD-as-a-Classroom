@@ -6,19 +6,19 @@ ASSIGNMENT_ACCEPT_KEY=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.assignmentAcceptK
 
 # Convert app private keys to PKCS8 format, just in case webcrypto
 # doesn't play well with PKCS1 again in the future
-echo "$STUDENT_ASSIGNMENT_WRITING_APP_PRIVATE_KEY" > private-key-pkcs1.pem
-openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key-pkcs1.pem -out student-assignment-writing-app-private-key.pem
-IFS= read -r -d '' STUDENT_ASSIGNMENT_WRITING_APP_PRIVATE_KEY < student-assignment-writing-app-private-key.pem || true
-export STUDENT_ASSIGNMENT_WRITING_APP_PRIVATE_KEY
+echo "$ASSIGNMENT_CREATION_APP_PRIVATE_KEY" > private-key-pkcs1.pem
+openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key-pkcs1.pem -out assignment-creation-app-private-key.pem
+IFS= read -r -d '' ASSIGNMENT_CREATION_APP_PRIVATE_KEY < assignment-creation-app-private-key.pem || true
+export ASSIGNMENT_CREATION_APP_PRIVATE_KEY
 rm -f private-key-pkcs1.pem
-rm -f student-assignment-writing-app-private-key.pem
+rm -f assignment-creation-app-private-key.pem
 
-echo "$ASSIGNMENT_TEMPLATE_READING_APP_PRIVATE_KEY" > private-key-pkcs1.pem
-openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key-pkcs1.pem -out assignment-template-reading-app-private-key.pem
-IFS= read -r -d '' ASSIGNMENT_TEMPLATE_READING_APP_PRIVATE_KEY < assignment-template-reading-app-private-key.pem || true
-export ASSIGNMENT_TEMPLATE_READING_APP_PRIVATE_KEY
+echo "$CLASSROOMS_APP_PRIVATE_KEY" > private-key-pkcs1.pem
+openssl pkcs8 -topk8 -inform PEM -outform PEM -nocrypt -in private-key-pkcs1.pem -out classrooms-app-private-key.pem
+IFS= read -r -d '' CLASSROOMS_APP_PRIVATE_KEY < classrooms-app-private-key.pem || true
+export CLASSROOMS_APP_PRIVATE_KEY
 rm -f private-key-pkcs1.pem
-rm -f assignment-template-reading-app-private-key.pem
+rm -f classrooms-app-private-key.pem
 
 # Mask user access token and assignment accept key in logs
 echo "::add-mask::${USER_ACCESS_TOKEN}"
@@ -53,14 +53,14 @@ STUDENT_ASSIGNMENT_REPO="${ASSIGNMENT_NAME}-${STUDENT_USERNAME}"
 # Replace forbidden characters with hyphens
 export STUDENT_ASSIGNMENT_REPO=$(echo -n "$STUDENT_ASSIGNMENT_REPO" | sed 's/[^a-zA-Z0-9_\.-]/-/g')
 
-# Get installation access token for student assignment writing app
-student_assignment_writing_app_installation_access_token=$(node repo/workflow-util/getstudentassignmentwritingappinstallationaccesstoken.js)
-echo "::add-mask::${student_assignment_writing_app_installation_access_token}"
+# Get installation access token for assignment creation app
+assignment_creation_app_installation_access_token=$(node repo/workflow-util/getassignmentcreationappinstallationaccesstoken.js)
+echo "::add-mask::${assignment_creation_app_installation_access_token}"
 
 # Check if student assignment repo already exists.
 get_remote_repo_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
     -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${student_assignment_writing_app_installation_access_token}" \
+    -H "Authorization: Bearer ${assignment_creation_app_installation_access_token}" \
     -H "X-GitHub-Api-Version: 2026-03-10" \
     "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${STUDENT_ASSIGNMENT_REPO}")
 
@@ -68,25 +68,25 @@ if [[ "$get_remote_repo_status" == "404" ]]
 then
     # Repo doesn't exist. Create it.
 
-    # Get installation access token for assignment template reading app
-    assignment_template_reading_app_installation_access_token=$(node repo/workflow-util/getassignmenttemplatereadingappinstallationaccesstoken.js)
-    echo "::add-mask::${assignment_template_reading_app_installation_access_token}"
+    # Get installation access token for classrooms app
+    classrooms_app_installation_access_token=$(node repo/workflow-util/getclassroomsappinstallationaccesstoken.js)
+    echo "::add-mask::${classrooms_app_installation_access_token}"
 
-    # Clone assignment template repo
-    git clone "https://${ASSIGNMENT_TEMPLATE_READ_USERNAME}:${assignment_template_reading_app_installation_access_token}@${ASSIGNMENT_TEMPLATE_REPO}" assignments-repo
+    # Clone classrooms repo
+    git clone --depth 1 "https://${CLASSROOMS_USERNAME}:${classrooms_app_installation_access_token}@${CLASSROOMS_REPO}" classrooms-repo
 
     # Verify that the assignment to be accepted exists (either as a
     # directory with contents or in config file)
     assignment_exists=1
     assignment_template_exists=1
-    if [[ ! -d "assignments-repo/assignments/${ASSIGNMENT_NAME}" ]]
+    if [[ ! -d "classrooms-repo/assignments/${ASSIGNMENT_NAME}" ]]
     then
         assignment_template_exists=0
-        if [[ ! -f "assignments-repo/assignments/assignments.conf" ]]
+        if [[ ! -f "classrooms-repo/assignments/assignments.conf" ]]
         then
             assignment_exists=0
         else
-            n_matching_assignments=$(cat "assignments-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -s 'length')
+            n_matching_assignments=$(cat "classrooms-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -s 'length')
             if [[ "$n_matching_assignments" == 0 ]]
             then
                 assignment_exists=0
@@ -103,9 +103,9 @@ then
     fi
 
     # Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
-    if [[ -f "assignments-repo/assignments/assignments.conf" ]]
+    if [[ -f "classrooms-repo/assignments/assignments.conf" ]]
     then
-        assignment_accept_key=$(cat "assignments-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rs 'if (length > 0) and (.[0].key != null) then .[0].key else "" end')
+        assignment_accept_key=$(cat "classrooms-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rs 'if (length > 0) and (.[0].key != null) then .[0].key else "" end')
         if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
         then
             # Invalid assignment accept key. Return error to client.
@@ -119,7 +119,7 @@ then
     create_remote_repo_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
         -X POST \
         -H "Accept: application/vnd.github+json" \
-        -H "Authorization: Bearer ${student_assignment_writing_app_installation_access_token}" \
+        -H "Authorization: Bearer ${assignment_creation_app_installation_access_token}" \
         -H "X-GitHub-Api-Version: 2026-03-10" \
         "https://api.github.com/orgs/${STUDENT_ASSIGNMENT_ORGANIZATION}/repos" \
         -d '{"name":"'"$STUDENT_ASSIGNMENT_REPO"'","description":"'"${STUDENT_USERNAME}'s"' repository for assignment '"$ASSIGNMENT_NAME"'","private":true}')
@@ -144,13 +144,13 @@ then
     if [[ "$assignment_template_exists" == 1 ]]
     then
         mkdir -p "$STUDENT_ASSIGNMENT_REPO"
-        cp -R assignments-repo/assignments/"$ASSIGNMENT_NAME"/* "$STUDENT_ASSIGNMENT_REPO"
+        cp -R classrooms-repo/assignments/"$ASSIGNMENT_NAME"/* "$STUDENT_ASSIGNMENT_REPO"
         (
             cd "$STUDENT_ASSIGNMENT_REPO"
             git init -b main
             git add -A
             git commit -m "Classroom Robot: Instantiate assignment"
-            remote_repo_git_url="https://${STUDENT_ASSIGNMENT_WRITE_USERNAME}:${student_assignment_writing_app_installation_access_token}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${STUDENT_ASSIGNMENT_REPO}.git"
+            remote_repo_git_url="https://${ASSIGNMENT_CREATION_USERNAME}:${assignment_creation_app_installation_access_token}@${STUDENT_PLATFORM_GIT_HOSTNAME}/${STUDENT_ASSIGNMENT_ORGANIZATION}/${STUDENT_ASSIGNMENT_REPO}.git"
             git push "$remote_repo_git_url" main
         )
     fi
@@ -165,7 +165,7 @@ fi
 # Check if student already has access to repository.
 get_collaborator_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
     -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${student_assignment_writing_app_installation_access_token}" \
+    -H "Authorization: Bearer ${assignment_creation_app_installation_access_token}" \
     -H "X-GitHub-Api-Version: 2026-03-10" \
     "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${STUDENT_ASSIGNMENT_REPO}/collaborators/$STUDENT_USERNAME")
 if [[ "$get_collaborator_status" == "404" ]]
@@ -181,7 +181,7 @@ then
         -s -o /dev/null -w "%{http_code}" \
         -X PUT \
         -H "Accept: application/vnd.github+json" \
-        -H "Authorization: Bearer ${student_assignment_writing_app_installation_access_token}" \
+        -H "Authorization: Bearer ${assignment_creation_app_installation_access_token}" \
         -H "X-GitHub-Api-Version: 2026-03-10" \
         "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${STUDENT_ASSIGNMENT_REPO}/collaborators/${STUDENT_USERNAME}" \
         -d '{"permission":"push"}')

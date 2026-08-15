@@ -50,25 +50,25 @@ else
 	echo "DEPLOYED_BACKEND_WORKFLOWS_REPO_DIR not defined in .env. Skipping."
 fi
 
-if [[ "$DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR" != "" ]]
+if [[ "$DEPLOYED_CLASSROOMS_REPO_DIR" != "" ]]
 then
-	read -p "About to reset contents of $DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR. Press enter to continue, or CTRL+C to cancel."
+	read -p "About to reset contents of $DEPLOYED_CLASSROOMS_REPO_DIR. Press enter to continue, or CTRL+C to cancel."
 	
-	mkdir -p "$DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR"
+	mkdir -p "$DEPLOYED_CLASSROOMS_REPO_DIR"
 	tmp_dir="/tmp/classroom-dev-tools/"
 	rm -rf "$tmp_dir"
 	mkdir -p "$tmp_dir"
-	mv "$DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR/.git" "$tmp_dir"
-	find "$DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR" -mindepth 1 -delete
-	mv "$tmp_dir/.git" "$DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR"
+	mv "$DEPLOYED_CLASSROOMS_REPO_DIR/.git" "$tmp_dir"
+	find "$DEPLOYED_CLASSROOMS_REPO_DIR" -mindepth 1 -delete
+	mv "$tmp_dir/.git" "$DEPLOYED_CLASSROOMS_REPO_DIR"
 
-	cp -a "$script_dir/../assignment-templates"/. "$DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR"
+	cp -a "$script_dir/../classrooms"/. "$DEPLOYED_CLASSROOMS_REPO_DIR"
 	(
-		cd "$DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR"
+		cd "$DEPLOYED_CLASSROOMS_REPO_DIR"
 		git add -A
 		git commit -m "Update"
 		git push
 	)
 else
-	echo "DEPLOYED_ASSIGNMENT_TEMPLATES_REPO_DIR not defined in .env. Skipping."
+	echo "DEPLOYED_CLASSROOMS_REPO_DIR not defined in .env. Skipping."
 fi
