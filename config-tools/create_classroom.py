@@ -1529,7 +1529,8 @@ def exit_notes(organization_name: str) -> None:
     rprint()
     rprint(f'https://github.com/{organization_name}/classrooms')
     rprint()
-    rprint_wrapped(f'See README.md for more information')
+    rprint_wrapped(f'See the above repository\'s README.md for more '
+        f'information.')
 
 
 def main() -> int:
