@@ -165,11 +165,8 @@ def generate_and_sign_jwt(client_id: str, private_key: str) -> str:
 
 
 def get_installation_access_token(
-        client_id: str,
-        private_key: str,
+        encoded_jwt: str,
         installation_id: str) -> Json:
-    encoded_jwt = generate_and_sign_jwt(client_id, private_key)
-
     # Exchange JWT for installation access token and
     # repository_selection value
     headers = {
@@ -256,18 +253,21 @@ class AppDetails:
     installation_configuration_error_message: str
     next_registration_endpoint: str | None
     installation_verifier: InstallationVerifier
+    public: bool
     
     def __init__(
             self,
             installation_instructions: str,
             installation_configuration_error_message: str,
             installation_verifier: InstallationVerifier,
-            next_registration_endpoint: str | None = None) -> None:
+            next_registration_endpoint: str | None = None,
+            public: bool = False) -> None:
         self.installation_instructions = installation_instructions
         self.installation_configuration_error_message =\
             installation_configuration_error_message
         self.next_registration_endpoint = next_registration_endpoint
         self.installation_verifier = installation_verifier
+        self.public = public
 
 
 class HandlerContext:
@@ -377,6 +377,7 @@ class HandlerContext:
         ASSIGNMENT_CREATION_APP_ENDPOINT: {
             'administration': 'write',
             'contents': 'write',
+            'actions_variables': 'write',
             'metadata': 'read'
         },
         CLASSROOMS_APP_ENDPOINT: {
@@ -410,7 +411,8 @@ class HandlerContext:
             next_registration_endpoint=\
                 ASSIGNMENT_CREATION_APP_ENDPOINT,
             installation_verifier=\
-                verify_backend_workflow_dispatch_app_installation
+                verify_backend_workflow_dispatch_app_installation,
+            public=True
         ),
         ASSIGNMENT_CREATION_APP_ENDPOINT: AppDetails(
             installation_instructions=(f'Install the Assignment Creation '
@@ -511,7 +513,7 @@ window.addEventListener('DOMContentLoaded', () => {{
     ],
     "setup_url": "http://localhost:{context.server_port}/{registration_endpoint}/setup",
     "description": "{context.APP_DESCRIPTIONS[registration_endpoint]}",
-    "public": false,
+    "public": {'true' if context.APP_DETAILS[registration_endpoint].public else 'false'},
     "default_permissions": {app_default_permissions},
     "setup_on_update": true
   }})
@@ -591,7 +593,7 @@ window.addEventListener('DOMContentLoaded', () => {{
             client_secret = response_json['client_secret']
             private_key = response_json['pem']
             html_url = response_json['html_url']
-            installation_url=f'{html_url}/installations/new'
+            installation_url = f'{html_url}/installations/new'
             context.app_registration_responses[
                 registration_endpoint
             ] = AppRegistrationResponse(
@@ -639,27 +641,9 @@ window.addEventListener('DOMContentLoaded', () => {{
         
         def get_installation_repository_access(
                 self,
-                registration_endpoint: str)\
-                -> tuple[str, list[Repository] | None]:
-            client_id = context.app_registration_responses[
-                registration_endpoint
-            ].client_id
-            private_key = context.app_registration_responses[
-                registration_endpoint
-            ].private_key
-            installation_id = context.app_installation_responses[
-                registration_endpoint
-            ].installation_id
-
-            installation_access_token_data = get_installation_access_token(
-                client_id,
-                private_key,
-                installation_id
-            )
-            installation_access_token = installation_access_token_data['token']
-            repository_selection = \
-                installation_access_token_data['repository_selection']
-
+                installation_access_token: str,
+                repository_selection: str)\
+                -> list[Repository] | None:
             repositories = None
             if repository_selection == 'selected':
                 headers = {
@@ -680,7 +664,51 @@ window.addEventListener('DOMContentLoaded', () => {{
                 response_json = response.json()
                 repositories = response_json['repositories']
 
-            return repository_selection, repositories
+            return repositories
+
+
+        def get_installation_account(
+                self,
+                encoded_jwt: str,
+                installation_id: str) -> str:
+            headers = {
+                'X-GitHub-Api-Version': '2026-03-10',
+                'Accept': 'application/vnd.github+json',
+                'Authorization': f'Bearer {encoded_jwt}'
+            }
+            response = requests.get(
+                f'https://api.github.com/app/installations/{installation_id}',
+                headers=headers
+            )
+
+            if response.status_code < 200 or response.status_code >= 300:
+                raise ValueError(f'Got HTTP status code '
+                    f'{response.status_code} when retrieving app installation '
+                    'information')
+
+            response_json = response.json()
+            account: str = response_json['account']['login']
+            return account
+
+
+        def delete_installation(
+                self,
+                encoded_jwt: str,
+                installation_id: str) -> None:
+            headers = {
+                'X-GitHub-Api-Version': '2026-03-10',
+                'Accept': 'application/vnd.github+json',
+                'Authorization': f'Bearer {encoded_jwt}'
+            }
+            response = requests.delete(
+                f'https://api.github.com/app/installations/{installation_id}',
+                headers=headers
+            )
+
+            if response.status_code < 200 or response.status_code >= 300:
+                raise ValueError(f'Got HTTP status code '
+                    f'{response.status_code} when deleting errant '
+                    f'installation')
 
 
         def setup_app(
@@ -696,15 +724,56 @@ window.addEventListener('DOMContentLoaded', () => {{
 
             installation_id = str(path_params_dict['installation_id'])
 
-            context.app_installation_responses[
-                    registration_endpoint
-            ] = AppInstallationResponse(installation_id)
+            # Get installation access token and repository selection
+            client_id = context.app_registration_responses[
+                registration_endpoint
+            ].client_id
+            private_key = context.app_registration_responses[
+                registration_endpoint
+            ].private_key
+
+            encoded_jwt = generate_and_sign_jwt(client_id, private_key)
+            installation_access_token_data = get_installation_access_token(
+                encoded_jwt,
+                installation_id
+            )
+            installation_access_token = installation_access_token_data['token']
+            repository_selection = \
+                installation_access_token_data['repository_selection']
             
+            # Verify that the installation belongs to the correct organization
+            installation_account = \
+                self.get_installation_account(
+                    encoded_jwt,
+                    installation_id
+                )
+            
+            if installation_account != context.organization_name:
+                # Installed on wrong account. Delete errant installation
+                self.delete_installation(encoded_jwt, installation_id)
+                
+                # Present error message and ask them to try again.
+                installation_url = \
+                    context.app_registration_responses[
+                        registration_endpoint
+                    ].installation_url
+                html=f'''<html><head><meta http-equiv="Cache-Control" content="no-cache"><meta charset="UTF-8"></head><body><div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center"><div style="margin-bottom: 1em">Please do not close this tab</div><div style="margin-bottom: 1em">Error: You installed the app on the wrong account. Your installation has been deleted. Please try again.</div><div style="margin-bottom: 1em">{context.APP_DETAILS[registration_endpoint].installation_instructions}</div><form id="manifest-form" action="{installation_url}" method="get">
+    <input type="submit" value="Click here to begin action item">
+    </form></div></body></html>
+    '''
+
+                self.send_response(200)
+                self.send_header('Content-type', 'text/html')
+                self.end_headers()
+                self.wfile.write(html.encode('utf-8'))
+                return
+
             # Verify that the user configured the installation properly,
             # giving it access to the correct repositories
-            repository_selection, repositories =\
+            repositories =\
                 self.get_installation_repository_access(
-                    registration_endpoint
+                    installation_access_token,
+                    repository_selection
                 )
             verified = context.APP_DETAILS[registration_endpoint]\
                 .installation_verifier(
@@ -726,6 +795,10 @@ window.addEventListener('DOMContentLoaded', () => {{
                 return
 
             # Else, installation was configured properly. 
+            context.app_installation_responses[
+                    registration_endpoint
+            ] = AppInstallationResponse(installation_id)
+
             next_registration_endpoint = \
                 context.APP_DETAILS[registration_endpoint]\
                     .next_registration_endpoint
@@ -1549,14 +1622,17 @@ def main() -> int:
         handler_context.CLASSROOM_SETUP_APP_ENDPOINT
     ].wait()
 
+    encoded_jwt = generate_and_sign_jwt(
+        handler_context.app_registration_responses[
+            handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+        ].client_id,
+        handler_context.app_registration_responses[
+            handler_context.CLASSROOM_SETUP_APP_ENDPOINT
+        ].private_key
+    )
     handler_context.classroom_setup_token = \
         get_installation_access_token(
-            handler_context.app_registration_responses[
-                handler_context.CLASSROOM_SETUP_APP_ENDPOINT
-            ].client_id,
-            handler_context.app_registration_responses[
-                handler_context.CLASSROOM_SETUP_APP_ENDPOINT
-            ].private_key,
+            encoded_jwt,
             handler_context.app_installation_responses[
                 handler_context.CLASSROOM_SETUP_APP_ENDPOINT
             ].installation_id

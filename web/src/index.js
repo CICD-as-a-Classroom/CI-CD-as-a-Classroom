@@ -307,6 +307,14 @@ async function acceptAssignment(organizationName, workflowDispatchAppInstallatio
                     zip: null
                 };
             }
+        } else if (statusObj.status == 'duplicate-username') {
+            showError(`Repository already exists but somehow belongs to a different student (perhaps you recently changed your username, or you modified the STUDENT_ID repository variable). Instructor intervention is required.`);
+            return {
+                refreshedAccessToken: accessToken,
+                refreshedRefreshToken: refreshToken,
+                succeeded: false,
+                zip: null
+            };
         } else if (statusObj.status != 'success') {
             showError(`Artifact result archive reported non-success status "${statusObj.status}"`);
             return {
