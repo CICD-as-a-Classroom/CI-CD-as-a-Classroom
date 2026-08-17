@@ -188,6 +188,25 @@ def get_installation_access_token(
     return response_json
 
 
+def uninstall_app(
+        encoded_jwt: str,
+        installation_id: str) -> None:
+    # Use JWT to delete installation
+    headers = {
+        'X-GitHub-Api-Version': '2026-03-10',
+        'Accept': 'application/vnd.github+json',
+        'Authorization': f'Bearer {encoded_jwt}'
+    }
+    response = requests.delete(
+        (f'https://api.github.com/app/installations/{installation_id}'),
+        headers=headers
+    )
+
+    if response.status_code < 200 or response.status_code >= 300:
+        raise ValueError(f'Got HTTP status code {response.status_code} '
+            f'when deleting app installation')
+
+
 class NotifyingServer(ThreadingHTTPServer):
     def __init__(
             self,
@@ -691,26 +710,6 @@ window.addEventListener('DOMContentLoaded', () => {{
             return account
 
 
-        def delete_installation(
-                self,
-                encoded_jwt: str,
-                installation_id: str) -> None:
-            headers = {
-                'X-GitHub-Api-Version': '2026-03-10',
-                'Accept': 'application/vnd.github+json',
-                'Authorization': f'Bearer {encoded_jwt}'
-            }
-            response = requests.delete(
-                f'https://api.github.com/app/installations/{installation_id}',
-                headers=headers
-            )
-
-            if response.status_code < 200 or response.status_code >= 300:
-                raise ValueError(f'Got HTTP status code '
-                    f'{response.status_code} when deleting errant '
-                    f'installation')
-
-
         def setup_app(
                 self,
                 registration_endpoint: str) -> None:
@@ -750,7 +749,7 @@ window.addEventListener('DOMContentLoaded', () => {{
             
             if installation_account != context.organization_name:
                 # Installed on wrong account. Delete errant installation
-                self.delete_installation(encoded_jwt, installation_id)
+                uninstall_app(encoded_jwt, installation_id)
                 
                 # Present error message and ask them to try again.
                 installation_url = \
@@ -1573,28 +1572,6 @@ def populate_repositories(
         )
 
 
-def uninstall_app(
-        client_id: str,
-        private_key: str,
-        installation_id: str) -> None:
-    encoded_jwt = generate_and_sign_jwt(client_id, private_key)
-
-    # Use JWT to delete installation
-    headers = {
-        'X-GitHub-Api-Version': '2026-03-10',
-        'Accept': 'application/vnd.github+json',
-        'Authorization': f'Bearer {encoded_jwt}'
-    }
-    response = requests.delete(
-        (f'https://api.github.com/app/installations/{installation_id}'),
-        headers=headers
-    )
-
-    if response.status_code < 200 or response.status_code >= 300:
-        raise ValueError(f'Got HTTP status code {response.status_code} '
-            f'when deleting app installation')
-
-
 def exit_notes(organization_name: str) -> None:
     rprint_wrapped('Configuration complete.')
     rprint(f'- You can now create assignments in your classroom '
@@ -1669,12 +1646,7 @@ def main() -> int:
         handler_context.classroom_setup_token
     )
     uninstall_app(
-        handler_context.app_registration_responses[
-            handler_context.CLASSROOM_SETUP_APP_ENDPOINT
-        ].client_id,
-        handler_context.app_registration_responses[
-            handler_context.CLASSROOM_SETUP_APP_ENDPOINT
-        ].private_key,
+        encoded_jwt,
         handler_context.app_installation_responses[
             handler_context.CLASSROOM_SETUP_APP_ENDPOINT
         ].installation_id
