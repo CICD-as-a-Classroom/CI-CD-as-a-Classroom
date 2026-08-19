@@ -381,6 +381,7 @@ class HandlerContext:
     }
     APP_PERMISSIONS = {
         CLASSROOM_SETUP_APP_ENDPOINT: {
+            'organization_administration': 'write',
             'administration': 'write',
             'contents': 'write',
             'pages': 'write',
@@ -1572,9 +1573,58 @@ def populate_repositories(
         )
 
 
+def harden_organization(
+        organization_name: str,
+        classroom_setup_token: str) -> None:
+    rprint_wrapped('By default, all members of a GitHub organization can '
+        'directly create repositories within the organization. In most '
+        'cases, this is unnecessary for students since their assignment '
+        'repositories are system-generated.')
+    rprint()
+
+    valid_input = False
+    harden = True
+    while not valid_input:
+        user_input = input('Would you like to disable the ability for '
+            'organization members to create repositories? [Y|n]: ')
+        user_input = user_input.strip().lower()
+
+        if user_input == '' or user_input == 'y':
+            valid_input = True
+            harden = True
+        elif user_input == 'n':
+            valid_input = True
+            harden = False
+        else:
+            rprint()
+            rprint_wrapped('Error: Invalid Input', style='bold red')
+            rprint()
+    
+    if harden:
+        headers = {
+            'X-GitHub-Api-Version': '2026-03-10',
+            'Accept': 'application/vnd.github+json',
+            'Authorization': f'Bearer {classroom_setup_token}'
+        }
+        body = {
+                'members_can_create_repositories': False,
+                'members_can_fork_private_repositories': False,
+        }
+        response = requests.patch(
+            f'https://api.github.com/orgs/{organization_name}',
+            headers=headers,
+            json=body
+        )
+        if response.status_code < 200 or response.status_code >= 300:
+            raise ValueError(f'Got HTTP status code {response.status_code} '
+                f'when hardening organization')
+        
+
 def exit_notes(organization_name: str) -> None:
-    rprint_wrapped('Configuration complete.')
-    rprint(f'- You can now create assignments in your classroom '
+    rprint_wrapped('Automated configuration complete.')
+    rprint()
+    rprint_wrapped(f'You can now create assignments and configure your '
+        f'classroom within your '
         f'organization\'s "classrooms" repository:')
     rprint()
     rprint(f'https://github.com/{organization_name}/classrooms')
@@ -1582,6 +1632,20 @@ def exit_notes(organization_name: str) -> None:
     rprint_wrapped(f'See the above repository\'s README.md for more '
         f'information.')
 
+    rprint()
+
+    rprint_wrapped(f'Your classroom is ready to go, but it\'s recommended '
+        'that you manually complete some final organization hardening '
+        'measures. On the webpage linked below, '
+        'set "Projects base permissions" to "No access" and disable app '
+        'access requests. If you intend to grant students admin access to '
+        'one or more of their assignment repositories, additionally '
+        'disable "Allow repository admins to install GitHub apps for their '
+        'repositories", and disable all destructive admin repository '
+        'permissions (visibility change, deletion and transfer, issue '
+        'deletion, and branch renames).')
+    rprint()
+    rprint(f'https://github.com/organizations/{organization_name}/settings/member_privileges')
 
 def main() -> int:
     console.clear()
@@ -1645,6 +1709,14 @@ def main() -> int:
         organization_name,
         handler_context.classroom_setup_token
     )
+
+    console.clear()
+
+    harden_organization(
+        organization_name,
+        handler_context.classroom_setup_token
+    )
+    
     uninstall_app(
         encoded_jwt,
         handler_context.app_installation_responses[
@@ -1653,6 +1725,7 @@ def main() -> int:
     )
 
     console.clear()
+
     exit_notes(organization_name)
 
     return 0

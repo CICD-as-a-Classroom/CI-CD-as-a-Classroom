@@ -4,6 +4,8 @@ USER_ACCESS_TOKEN=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.userAccessToken')
 ASSIGNMENT_NAME=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.assignmentName')
 ASSIGNMENT_ACCEPT_KEY=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.assignmentAcceptKey')
 
+# TODO verify required inputs are present
+
 # Convert app private keys to PKCS8 format, just in case webcrypto
 # doesn't play well with PKCS1 again in the future
 echo "$ASSIGNMENT_CREATION_APP_PRIVATE_KEY" > private-key-pkcs1.pem
@@ -103,17 +105,26 @@ then
         exit 0
     fi
 
-    # Verify that given input key matches assignment's configured key (if a key is configured) before proceeding
+    # Read assignment config
     if [[ -f "classrooms-repo/assignments/assignments.conf" ]]
     then
-        assignment_accept_key=$(cat "classrooms-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rs 'if (length > 0) and (.[0].key != null) then .[0].key else "" end')
-        if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
-        then
-            # Invalid assignment accept key. Return error to client.
-            echo "Error: Invalid assignment accept key \"$ASSIGNMENT_ACCEPT_KEY\" for assignment \"$ASSIGNMENT_NAME\"" >&2
-            echo -n '{"status": "invalid-key"}' > result/status.json
-            exit 0
-        fi
+        assignment_accept_key=$(cat "classrooms-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rjs 'if (length > 0) and (.[0].key != null) then .[0].key else "" end')
+        assignment_student_role=$(cat "classrooms-repo/assignments/assignments.conf" | yq -o json '.[] | select(.name == "'"$ASSIGNMENT_NAME"'")' | jq -rjs 'if (length > 0) and (.[0].student_role != null) then .[0].student_role else "" end')
+    fi
+
+    # Override missing config fields with defaults
+    if [[ "$assignment_student_role" == "" ]]
+    then
+        assignment_student_role="push"
+    fi
+
+    # Verify input key matches assignment's configured accept key
+    if [[ "$assignment_accept_key" != "" && "$assignment_accept_key" != "$ASSIGNMENT_ACCEPT_KEY" ]]
+    then
+        # Invalid assignment accept key. Return error to client.
+        echo "Error: Invalid assignment accept key \"$ASSIGNMENT_ACCEPT_KEY\" for assignment \"$ASSIGNMENT_NAME\"" >&2
+        echo -n '{"status": "invalid-key"}' > result/status.json
+        exit 0
     fi
 
     # Create remote student assignment repo
@@ -231,7 +242,7 @@ then
         -H "Authorization: Bearer ${assignment_creation_app_installation_access_token}" \
         -H "X-GitHub-Api-Version: 2026-03-10" \
         "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${STUDENT_ASSIGNMENT_REPO}/collaborators/${STUDENT_USERNAME}" \
-        -d '{"permission":"push"}')
+        -d '{"permission":"'"$assignment_student_role"'"}')
 
     if [[ "$add_collaborator_status" == "403" ]]
     then

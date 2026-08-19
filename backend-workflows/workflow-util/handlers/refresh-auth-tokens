@@ -1,5 +1,7 @@
 USER_REFRESH_TOKEN=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.userRefreshToken')
 
+# TODO verify required inputs are present
+
 # Mask refresh token in logs
 echo "::add-mask::$USER_REFRESH_TOKEN"
 

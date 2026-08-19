@@ -1,6 +1,8 @@
 AUTH_CODE=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.authCode')
 PKCE_CODE_VERIFIER=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.pkceCodeVerifier')
 
+# TODO verify required inputs are present
+
 # Mask auth code and code verifier in logs
 echo "::add-mask::$AUTH_CODE"
 echo "::add-mask::$PKCE_CODE_VERIFIER"
