@@ -282,13 +282,6 @@ export async function dispatchWorkflowViaIssue(organizationName, workflowDispatc
         }
         
         for (const comment of issuePollResponseData) {
-            if (comment['user']['type'] != 'Bot') {
-                // Response should be from backend workflow, authenticated via
-                // app installation access token, so the account type should
-                // be 'Bot'
-                continue;
-            }
-
             const utf8Decoder = new TextDecoder('utf-8');
             const commentResponseBodyJson = utf8Decoder.decode(Uint8Array.fromBase64(comment['body']));
             const commentResponseBody = JSON.parse(commentResponseBodyJson);

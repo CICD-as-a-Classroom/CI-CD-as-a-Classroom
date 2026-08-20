@@ -1,6 +1,5 @@
 #!/bin/bash
 
-USER_ACCESS_TOKEN=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.userAccessToken')
 ASSIGNMENT_NAME=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.assignmentName')
 ASSIGNMENT_ACCEPT_KEY=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.assignmentAcceptKey')
 
@@ -22,8 +21,7 @@ export CLASSROOMS_APP_PRIVATE_KEY
 rm -f private-key-pkcs1.pem
 rm -f classrooms-app-private-key.pem
 
-# Mask user access token and assignment accept key in logs
-echo "::add-mask::${USER_ACCESS_TOKEN}"
+# Mask assignment accept key in logs
 echo "::add-mask::${ASSIGNMENT_ACCEPT_KEY}"
 
 # Git config
@@ -177,7 +175,7 @@ fi
 # Check if student already has access to repository.
 get_collaborator_status=$(curl -s -o /dev/null -w "%{http_code}" -L \
     -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${assignment_creation_app_installation_access_token}" \
+    -H "Authorization: Bearer ${USER_ACCESS_TOKEN}" \
     -H "X-GitHub-Api-Version: 2026-03-10" \
     "https://api.github.com/repos/${STUDENT_ASSIGNMENT_ORGANIZATION}/${STUDENT_ASSIGNMENT_REPO}/collaborators/$STUDENT_USERNAME")
 if [[ "$get_collaborator_status" == "404" ]]

@@ -1057,7 +1057,7 @@ ALL_REPOSITORY_INPUT_DATA = {
         description=('This repository strictly '
             'contains backend workflows dispatched by the web frontend '
             '(e.g., to authenticate students, accept assignments, etc).'),
-        private=True
+        private=False
     ),
     'web': RepositoryInputData(
         description=('This repository contains the web frontend '

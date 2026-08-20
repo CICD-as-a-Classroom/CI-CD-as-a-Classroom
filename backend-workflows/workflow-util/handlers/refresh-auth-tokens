@@ -1,5 +1,7 @@
 USER_REFRESH_TOKEN=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.userRefreshToken')
 
+HANDLER_EXIT_CODE=1
+
 # TODO verify required inputs are present
 
 # Mask refresh token in logs
@@ -15,10 +17,11 @@ auth_status=$(curl -X POST -s -o curl.json -w "%{http_code}" -H "Accept: applica
 if [[ "$auth_status" != 200 ]]
 then
     echo -n '{"status": "failure"}' > result/status.json
+    HANDLER_EXIT_CODE=0
     exit 0
 fi
 
-access_token=$(cat curl.json | jq '.access_token')
+USER_ACCESS_TOKEN=$(cat curl.json | jq '.access_token')
 refresh_token=$(cat curl.json | jq '.refresh_token')
 access_token_expires_in=$(cat curl.json | jq '.expires_in')
 refresh_token_expires_in=$(cat curl.json | jq '.refresh_token_expires_in')
@@ -26,10 +29,11 @@ refresh_token_expires_in=$(cat curl.json | jq '.refresh_token_expires_in')
 rm -f curl.json
 
 # Mask tokens in logs
-echo "::add-mask::$access_token"
+echo "::add-mask::$USER_ACCESS_TOKEN"
 echo "::add-mask::$refresh_token"
 
 # Store result
-echo -n '{"accessToken": '"$access_token"', "refreshToken": '"$refresh_token"', "accessTokenExpiresInSeconds": '"$access_token_expires_in"', "refreshTokenExpiresInSeconds": '"$refresh_token_expires_in"'}' > result/data.json
+echo -n '{"accessToken": '"$USER_ACCESS_TOKEN"', "refreshToken": '"$refresh_token"', "accessTokenExpiresInSeconds": '"$access_token_expires_in"', "refreshTokenExpiresInSeconds": '"$refresh_token_expires_in"'}' > result/data.json
 echo -n '{"status": "success"}' > result/status.json
+HANDLER_EXIT_CODE=0
 exit 0

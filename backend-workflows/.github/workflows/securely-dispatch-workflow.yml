@@ -77,10 +77,23 @@ jobs:
           # its remaining per-handler inputs
           export WORKFLOW_INPUTS_JSON
 
-          # Parse event name, verifier, and result encryption key
+          # Parse event name, verifier, result encryption key, and user access
+          # token if it exists (should always be provided except for in
+          # auth handlers)
           EVENT_NAME=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.eventName')
           VERIFIER=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.verifier')
           RESULT_ENCRYPTION_KEY=$(echo "$WORKFLOW_INPUTS_JSON" | jq -r '.resultEncryptionKey')
+          USER_ACCESS_TOKEN=$(echo "$WORKFLOW_INPUTS_JSON" | jq -rj '.userAccessToken | if . != null then . else "" end')
+
+          # Mask user access token in logs
+          if [[ "$USER_ACCESS_TOKEN" != "" ]]
+          then
+              echo "::add-mask::$USER_ACCESS_TOKEN"
+          fi
+
+          # Export user access token so that it can be accessed by handlers
+          # that need it
+          export USER_ACCESS_TOKEN
           
           # Convert result encryption key from base64url to regular base64
           RESULT_ENCRYPTION_KEY=$(echo -n "$RESULT_ENCRYPTION_KEY" | tr '_-' '/+')
@@ -92,23 +105,6 @@ jobs:
           # Prepare result directory
           mkdir -p result
           rm -rf result/*
-
-          # Generate issue comment so that dispatching client can poll
-          # workflow status
-          issue_comment=$(node repo/workflow-util/genissuecomment.js --runId="$GITHUB_RUN_ID" --verifier="$VERIFIER")
-          post_comment_status=$(curl -s -o curl.json -w "%{http_code}" -L \
-            -X POST \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer $GITHUB_TOKEN" \
-            -H "X-GitHub-Api-Version: 2026-03-10" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$GITHUB_EVENT_ISSUE_NUMBER/comments" \
-            -d '{"body":"'"$issue_comment"'"}')
-
-          if [[ "$post_comment_status" != "201" ]]
-          then
-              echo "Error: Got HTTP status $post_comment_status when posting issue comment" >&2
-              exit 1
-          fi
 
           function secureresult() {
               zip -qr result.zip result/* # Zip result/* for encryption
@@ -132,13 +128,39 @@ jobs:
           fi
 
           # Execute handler script
-          bash "$handler_file"
-          handler_exit_code="$?"
+          if [[ "${EVENT_NAME}" == "gen-user-auth-tokens-github" || "${EVENT_NAME}" == "refresh-auth-tokens" ]]
+          then
+              # Auth scripts are source'd instead of subshell'd so that they
+              # can set this script's USER_ACCESS_TOKEN variable (and
+              # HANDLER_EXIT_CODE), which
+              # is then used to secure results
+              source "$handler_file"
+          else
+              bash "$handler_file"
+              HANDLER_EXIT_CODE="$?"
+          fi
 
-          if [[ "$handler_exit_code" != 0 ]]
+          if [[ "$HANDLER_EXIT_CODE" != 0 ]]
           then
               # Handler failed to write result/. Notify dispatching client.
               echo -n '{"status": "handler-failed"}' > result/status.json
+          fi
+
+          # Generate issue comment so that dispatching client can poll
+          # workflow status
+          issue_comment=$(node repo/workflow-util/genissuecomment.js --runId="$GITHUB_RUN_ID" --verifier="$VERIFIER")
+          post_comment_status=$(curl -s -o curl.json -w "%{http_code}" -L \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${USER_ACCESS_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/$GITHUB_EVENT_ISSUE_NUMBER/comments" \
+            -d '{"body":"'"$issue_comment"'"}')
+
+          if [[ "$post_comment_status" != "201" ]]
+          then
+              echo "Error: Got HTTP status $post_comment_status when posting issue comment" >&2
+              exit 1
           fi
           
           # Secure result/ for sending to client as artifact
