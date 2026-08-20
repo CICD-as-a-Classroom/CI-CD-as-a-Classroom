@@ -1,3 +1,4 @@
+import { Octokit } from 'octokit';
 import JSZip from 'jszip';
 
 import * as util from '@/js/util.js'
@@ -233,7 +234,10 @@ async function acceptAssignment(organizationName, workflowDispatchAppInstallatio
         if (assignmentAcceptKey !== null) {
             workflowInputs['assignmentAcceptKey'] = assignmentAcceptKey;
         }
-        zip = await util.dispatchWorkflowViaIssue(organizationName, workflowDispatchAppInstallation, 'accept-assignment', workflowInputs, updateWorkflowStatus, siteConfig.pollDelay);
+        const accessTokenOctokit = new Octokit({
+            auth: accessToken
+        });
+        zip = await util.dispatchWorkflowViaIssue(organizationName, workflowDispatchAppInstallation, 'accept-assignment', workflowInputs, updateWorkflowStatus, siteConfig.pollDelay, accessTokenOctokit);
 
         if (zip === null) {
             // Workflow failed. Error message should already be displayed via
